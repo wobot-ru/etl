@@ -1,4 +1,4 @@
-package org.myorg.quickstart
+package ru.wobot.etl
 
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -30,7 +30,7 @@ import org.apache.flink.api.scala._
  *   - use Tuple data types.
  *   - write and use user-defined functions.
  */
-object WordCount {
+object SegmentExporter {
   def main(args: Array[String]) {
 
     // set up the execution environment
