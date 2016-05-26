@@ -1,8 +1,12 @@
 package ru.wobot.etl
 
-/**
-  * Created by kviz on 5/25/2016.
-  */
-class Profile {
 
+class Profile extends Indexable {
+  var smProfileId: String = _
+  var name: String = _
+  var city: String = _
+  var reach: String = _
+  var friendCount: String = _
+  var followerCount: String = _
+  var gender: String = _
 }
