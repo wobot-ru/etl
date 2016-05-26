@@ -12,5 +12,5 @@ class Post extends Indexable{
   var engagement:String = _
   var isComment:Boolean = _
 
-  override def toString: String = "%s,%s,%s".format(id,date,body)
+  override def toString: String = JsonUtil.toJson(this)
 }

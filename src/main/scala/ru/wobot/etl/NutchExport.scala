@@ -28,7 +28,7 @@ object NutchExport {
 
     val parseDataInput = env.createInput(new HadoopInputFormat[Text, ParseData](new SequenceFileInputFormat[Text, ParseData], classOf[Text], classOf[ParseData], jobParseData))
 
-    val dir: Path = new Path("c:\\crawl\\dbg")
+    val dir: Path = new Path("c:\\crawl\\segments")
     val fs = dir.getFileSystem(jobCrawlDatum.getConfiguration);
     val files = HadoopFSUtil.getPaths(fs.listStatus(dir, HadoopFSUtil.getPassDirectoriesFilter(fs)));
     for (p <- files)
@@ -135,15 +135,25 @@ object NutchExport {
     })
 
 
-    //val posts: DataSet[Tuple1[Post]] = map.filter(x => x._2 != null).map((tuple: (String, Post, Profile)) => new Tuple1[Post](tuple._2))
-    val posts = map.map((tuple: (String, Post, Profile)) => (tuple._1, tuple._2)).filter(x => x._2 != null)
+    val posts = map.filter(x => x._2 != null).map((tuple: (String, Post, Profile)) => (tuple._2.profileId, tuple._2))
     val profiles = map.map((tuple: (String, Post, Profile)) => (tuple._1, tuple._3)).filter(x => x._2 != null)
-    //val profiles: DataSet[Tuple1[Profile]] = map.filter(x => x._3 != null).map((tuple: (String, Post, Profile)) => new Tuple1[Profile](tuple._3))
 
-    profiles.writeAsCsv("c:\\tmp\\flink\\profiles-dump", writeMode = WriteMode.OVERWRITE)
-    posts.writeAsCsv("c:\\tmp\\flink\\posts-dump", writeMode = WriteMode.OVERWRITE)
+    //    profiles.writeAsCsv("c:\\tmp\\flink\\profiles-dump", writeMode = WriteMode.OVERWRITE)
+    //    posts.writeAsCsv("c:\\tmp\\flink\\posts-dump", writeMode = WriteMode.OVERWRITE)
+    //
+    //
+    //    env.execute("Save")
 
-    env.execute("Save");
+    val join: DataSet[((String, Post), (String, Profile))] = posts.join(profiles).where(0).equalTo(0)
+
+    join.writeAsCsv("c:\\tmp\\flink\\join-dump", writeMode = WriteMode.OVERWRITE)
+    val joinCount: Long = join.count()
+    val postCount: Long = posts.count()
+    //env.execute("Save")
+
+
+    println("join.count()=" + joinCount)
+    println("posts.count()=" + postCount)
     //    val countUnion: Long = crawlMap.union(parseMap).count()
     //    val crawlCount = crawlMap.count()
     //    val parseCount = parseMap.count()
