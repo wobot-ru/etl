@@ -1,8 +1,9 @@
 package ru.wobot.etl
 
 import com.google.gson.Gson
-import org.apache.flink.api.scala._
 import org.apache.flink.api.scala.hadoop.mapreduce.HadoopInputFormat
+import org.apache.flink.api.scala.{DataSet, _}
+import org.apache.flink.core.fs.FileSystem.WriteMode
 import org.apache.flink.util.Collector
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.io.Text
@@ -16,10 +17,9 @@ import ru.wobot.sm.core.mapping.{PostProperties, ProfileProperties}
 import ru.wobot.sm.core.meta.ContentMetaConstants
 import ru.wobot.sm.core.parse.ParseResult
 
-object SExp {
-
-
+object NutchExport {
   def main(args: Array[String]): Unit = {
+    val startTime = System.currentTimeMillis();
     val env = ExecutionEnvironment.getExecutionEnvironment
     val jobCrawlDatum = org.apache.hadoop.mapreduce.Job.getInstance()
     val jobParseData = org.apache.hadoop.mapreduce.Job.getInstance()
@@ -134,8 +134,16 @@ object SExp {
         }
     })
 
-    val profileCount: Long = map.count()
-    println("Total profiles=" + profileCount)
+
+    //val posts: DataSet[Tuple1[Post]] = map.filter(x => x._2 != null).map((tuple: (String, Post, Profile)) => new Tuple1[Post](tuple._2))
+    val posts = map.map((tuple: (String, Post, Profile)) => (tuple._1, tuple._2)).filter(x => x._2 != null)
+    val profiles = map.map((tuple: (String, Post, Profile)) => (tuple._1, tuple._3)).filter(x => x._2 != null)
+    //val profiles: DataSet[Tuple1[Profile]] = map.filter(x => x._3 != null).map((tuple: (String, Post, Profile)) => new Tuple1[Profile](tuple._3))
+
+    profiles.writeAsCsv("c:\\tmp\\flink\\profiles-dump", writeMode = WriteMode.OVERWRITE)
+    posts.writeAsCsv("c:\\tmp\\flink\\posts-dump", writeMode = WriteMode.OVERWRITE)
+
+    env.execute("Save");
     //    val countUnion: Long = crawlMap.union(parseMap).count()
     //    val crawlCount = crawlMap.count()
     //    val parseCount = parseMap.count()
@@ -143,5 +151,7 @@ object SExp {
     //    println("Total parseMap=" + parseCount)
     //    println("Total counts=" + (crawlCount + parseCount))
     //    println("Total countUnion=" + countUnion)
+    val elapsedTime = System.currentTimeMillis() - startTime;
+    println("elapsedTime=" + elapsedTime)
   }
 }

@@ -3,14 +3,12 @@ package ru.wobot.etl
 import java.lang.Iterable
 
 import com.google.gson.Gson
-import org.apache.flink.api.common.functions.{FilterFunction, FlatMapFunction, GroupReduceFunction, MapFunction}
-import org.apache.flink.api.common.io.BinaryOutputFormat
+import org.apache.flink.api.common.functions.{FilterFunction, FlatMapFunction, GroupReduceFunction}
 import org.apache.flink.api.java.ExecutionEnvironment
-import org.apache.flink.api.java.functions.KeySelector
-import org.apache.flink.api.java.io.{CsvOutputFormat, TypeSerializerOutputFormat}
 import org.apache.flink.api.java.operators._
-import org.apache.flink.api.java.tuple.{Tuple2, Tuple3, Tuple4}
+import org.apache.flink.api.java.tuple.{Tuple2, Tuple3}
 import org.apache.flink.api.scala.hadoop.mapreduce.HadoopInputFormat
+import org.apache.flink.core.fs.FileSystem.WriteMode
 import org.apache.flink.util.Collector
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.io.{Text, Writable}
@@ -24,14 +22,12 @@ import org.apache.nutch.util.{HadoopFSUtil, StringUtil}
 import ru.wobot.sm.core.mapping.{PostProperties, ProfileProperties}
 import ru.wobot.sm.core.meta.ContentMetaConstants
 import ru.wobot.sm.core.parse.ParseResult
-import org.apache.flink.api.scala._
-import org.apache.flink.core
-import org.apache.flink.core.fs.FileSystem.WriteMode
 
 import scala.collection.JavaConverters._
 
-object SegmentExporter {
+object NutchExportWrapOnJava {
   def main(args: Array[String]) {
+    val startTime = System.currentTimeMillis();
     val env = ExecutionEnvironment.getExecutionEnvironment
     val job = org.apache.hadoop.mapreduce.Job.getInstance()
     val format = new HadoopInputFormat[Text, Writable](new SequenceFileInputFormat[Text, Writable], classOf[Text], classOf[Writable], job)
@@ -149,6 +145,7 @@ object SegmentExporter {
     })
 
 
+    val group1: GroupReduceOperator[Tuple2[Text, NutchWritable], Tuple3[String, Post, Profile]] = group
     val profileProj: ProjectOperator[_, Tuple2[String, Profile]] = group.project(0, 2)
     val profiles = profileProj.filter(new FilterFunction[Tuple2[String, Profile]]() {
       @throws[Exception]
@@ -172,6 +169,11 @@ object SegmentExporter {
     //    val profileCount: Long = profiles.count()
     //    println("Total posts=" + postCount)
     //    println("Total profiles=" + profileCount)
-    println("Total map2=" + map2.count())
+    posts.writeAsCsv("c:\\tmp\\flink\\posts-dump", WriteMode.OVERWRITE)
+    profiles.writeAsCsv("c:\\tmp\\flink\\profiles-dump", WriteMode.OVERWRITE)
+
+    env.execute("Save");
+    val elapsedTime = System.currentTimeMillis() - startTime;
+    println("elapsedTime=" + elapsedTime)
   }
 }
