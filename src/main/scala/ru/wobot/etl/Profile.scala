@@ -9,4 +9,6 @@ class Profile extends Indexable {
   var friendCount: String = _
   var followerCount: String = _
   var gender: String = _
+
+  override def toString: String = "%s,%s,%s".format(id, name, friendCount)
 }

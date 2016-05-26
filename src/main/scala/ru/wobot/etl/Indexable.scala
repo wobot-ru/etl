@@ -1,6 +1,6 @@
 package ru.wobot.etl
 
-class Indexable {
+class Indexable extends Serializable {
   var id: String = _
   var digest: String = _
   var segment: String = _
