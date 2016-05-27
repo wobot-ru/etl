@@ -21,6 +21,7 @@ object NutchExport {
   def main(args: Array[String]): Unit = {
     val startTime = System.currentTimeMillis();
     val env = ExecutionEnvironment.getExecutionEnvironment
+    env.getConfig.enableForceKryo()
     val jobCrawlDatum = org.apache.hadoop.mapreduce.Job.getInstance()
     val jobParseData = org.apache.hadoop.mapreduce.Job.getInstance()
 
@@ -117,11 +118,11 @@ object NutchExport {
                         post.source = parseMeta.get(ProfileProperties.SOURCE).asInstanceOf[String]
                         post.profileId = parseMeta.get(PostProperties.PROFILE_ID).asInstanceOf[String]
                         post.href = parseMeta.get(PostProperties.HREF).asInstanceOf[String]
-                        post.smPostId = String.valueOf(parseMeta.get(PostProperties.SM_POST_ID))
+                        post.smPostId = String.valueOf(parseMeta.get(PostProperties.SM_POST_ID)).replace(".0", "")
                         post.body = parseMeta.get(PostProperties.BODY).asInstanceOf[String]
                         post.date = parseMeta.get(PostProperties.POST_DATE).asInstanceOf[String]
                         post.isComment = parseMeta.get(PostProperties.IS_COMMENT).asInstanceOf[Boolean]
-                        post.engagement = String.valueOf(parseMeta.get(PostProperties.ENGAGEMENT))
+                        post.engagement = String.valueOf(parseMeta.get(PostProperties.ENGAGEMENT)).replace(".0", "")
                         post.parentPostId = parseMeta.get(PostProperties.PARENT_POST_ID).asInstanceOf[String]
                         out.collect(post.id, post, null)
                       }
@@ -135,32 +136,47 @@ object NutchExport {
     })
 
 
+
     val posts = map.filter(x => x._2 != null).map((tuple: (String, Post, Profile)) => (tuple._2.profileId, tuple._2))
     val profiles = map.map((tuple: (String, Post, Profile)) => (tuple._1, tuple._3)).filter(x => x._2 != null)
 
-    //    profiles.writeAsCsv("c:\\tmp\\flink\\profiles-dump", writeMode = WriteMode.OVERWRITE)
-    //    posts.writeAsCsv("c:\\tmp\\flink\\posts-dump", writeMode = WriteMode.OVERWRITE)
-    //
-    //
-    //    env.execute("Save")
+    profiles.writeAsCsv("c:\\tmp\\flink\\profiles-dump", writeMode = WriteMode.OVERWRITE)
+    posts.writeAsCsv("c:\\tmp\\flink\\posts-dump", writeMode = WriteMode.OVERWRITE)
 
     val join: DataSet[((String, Post), (String, Profile))] = posts.join(profiles).where(0).equalTo(0)
 
+
+    val leftJoin = posts.leftOuterJoin(profiles).where(0).equalTo(0) {
+      (left, right) =>
+        val (_, post) = left
+        if (right == null)
+          (post.id, post, Option.empty)
+        else {
+          val (_, profile) = right
+          (post.id, post, Option(profile))
+        }
+    }
+
+
+    val postsWithoutProfile = leftJoin.filter(x => x._3 == Option.empty).map(x => (x._2.id, x._2))
+    val postsWithProfile = leftJoin.filter(x => x._3 != Option.empty).map(x => (x._2.id, x._2, x._3.get))
+
     join.writeAsCsv("c:\\tmp\\flink\\join-dump", writeMode = WriteMode.OVERWRITE)
+    leftJoin.writeAsCsv("c:\\tmp\\flink\\left-join-dump", writeMode = WriteMode.OVERWRITE)
+    postsWithoutProfile.writeAsCsv("c:\\tmp\\flink\\post-without-profile-dump", writeMode = WriteMode.OVERWRITE)
+    postsWithProfile.writeAsCsv("c:\\tmp\\flink\\!post-with-profile-dump", writeMode = WriteMode.OVERWRITE)
     val joinCount: Long = join.count()
     val postCount: Long = posts.count()
-    //env.execute("Save")
+    val postsWithoutProfileCount: Long = postsWithoutProfile.count()
+    val postsWithProfileCount: Long = postsWithProfile.count()
 
 
     println("join.count()=" + joinCount)
     println("posts.count()=" + postCount)
-    //    val countUnion: Long = crawlMap.union(parseMap).count()
-    //    val crawlCount = crawlMap.count()
-    //    val parseCount = parseMap.count()
-    //    println("Total crawlMap=" + crawlCount)
-    //    println("Total parseMap=" + parseCount)
-    //    println("Total counts=" + (crawlCount + parseCount))
-    //    println("Total countUnion=" + countUnion)
+    println("postWithoutProfiles.count()=" + postsWithoutProfileCount)
+    println("postsWithProfileCount.count()==" + postsWithProfileCount)
+    println("postWithoutProfiles+postsWithProfileCount==" + (postsWithoutProfileCount + postsWithProfileCount))
+    println("join+postWithoutProfiles=" + (postsWithoutProfileCount + joinCount))
     val elapsedTime = System.currentTimeMillis() - startTime;
     println("elapsedTime=" + elapsedTime)
   }
