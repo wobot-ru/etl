@@ -1,6 +1,7 @@
 package ru.wobot.etl
 
 import com.google.gson.Gson
+import org.apache.flink.api.common.operators.Order
 import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.api.scala.hadoop.mapreduce.HadoopInputFormat
 import org.apache.flink.api.scala.{DataSet, _}
@@ -56,16 +57,18 @@ object NutchExport {
 
     val groupBy: GroupedDataSet[(String, NutchWritable)] = union.groupBy(0)
 
-    val gson = new Gson()
+
+
     val map = groupBy.reduceGroup(fun = (values: Iterator[(String, NutchWritable)], out: Collector[(String, Post, Profile)]) => {
+      val gson = new Gson()
       var key: String = null
       var fetchDatum: CrawlDatum = null
       var parseText: ParseText = null
       var parseData: ParseData = null
+
       for (elem <- values) {
-        val v = elem._2.get()
         key = elem._1
-        v match {
+        elem._2.get() match {
           case c: CrawlDatum => fetchDatum = c
           case p: ParseData => parseData = p
           case p: ParseText => parseText = p
@@ -90,7 +93,7 @@ object NutchExport {
               val subType = contentMeta.get(ContentMetaConstants.TYPE);
               if (subType != null && subType.equals(ru.wobot.sm.core.mapping.Types.PROFILE)) {
                 val profile = new Profile();
-                profile.id = key.toString
+                profile.id = key
                 profile.segment = segment
                 profile.crawlDate = crawlDate
                 profile.source = parseMeta.get(ProfileProperties.SOURCE)
@@ -140,8 +143,9 @@ object NutchExport {
 
 
 
-    val posts = map.filter(x => x._2 != null).map((tuple: (String, Post, Profile)) => (tuple._2.profileId, tuple._2))
+    val posts = map.filter(x => x._2 != null).map((tuple: (String, Post, Profile)) => (tuple._1, tuple._2))
     val profiles = map.filter(x => x._3 != null).map((tuple: (String, Post, Profile)) => (tuple._1, tuple._3))
+    val unicProfiles: DataSet[(String, Profile)] = profiles.groupBy((tuple: (String, Profile)) => tuple._2.id).sortGroup((tuple: (String, Profile)) => tuple._2.crawlDate, Order.DESCENDING).first(1)
 
     val leftJoin = posts.leftOuterJoin(profiles).where(0).equalTo(0) {
       (left, right) =>
@@ -153,23 +157,24 @@ object NutchExport {
           (post.id, post, Option(profile))
         }
     }
-
-
     val postsWithoutProfile = leftJoin.filter(x => x._3 == Option.empty).map(x => (x._2.id, x._2))
     val postsWithProfile = leftJoin.filter(x => x._3 != Option.empty).map(x => (x._2.id, x._2, x._3.get))
 
-
     def toCsvPath(out: String) = new Path(params.getRequired("csv"), out).toString
-    postsWithoutProfile.writeAsCsv(toCsvPath("posts-without-profiles"), writeMode = WriteMode.OVERWRITE)
-    postsWithProfile.writeAsCsv(toCsvPath("posts-and-profiles"), writeMode = WriteMode.OVERWRITE)
-    profiles.writeAsCsv(toCsvPath("profiles"), writeMode = WriteMode.OVERWRITE)
+    profiles.sortPartition(x=>x._1, Order.ASCENDING).writeAsCsv(toCsvPath("profiles"), writeMode = WriteMode.OVERWRITE)
+    unicProfiles.writeAsCsv(toCsvPath("unic-profiles"), writeMode = WriteMode.OVERWRITE)
     posts.writeAsCsv(toCsvPath("posts"), writeMode = WriteMode.OVERWRITE)
+    postsWithProfile.writeAsCsv(toCsvPath("posts-and-profiles"), writeMode = WriteMode.OVERWRITE)
+    postsWithoutProfile.writeAsCsv(toCsvPath("posts-without-profiles"), writeMode = WriteMode.OVERWRITE)
 
+    val profilesCount: Long = profiles.count()
+    val unicProfilesCount: Long = unicProfiles.count()
     val postCount: Long = posts.count()
     val postsWithoutProfileCount: Long = postsWithoutProfile.count()
     val postsWithProfileCount: Long = postsWithProfile.count()
 
-
+    println("unicProfiles.count()==" + unicProfilesCount)
+    println("profiles.count()==" + profilesCount)
     println("posts.count()=" + postCount)
     println("postWithoutProfiles.count()=" + postsWithoutProfileCount)
     println("postsWithProfile.count()==" + postsWithProfileCount)
