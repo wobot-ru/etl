@@ -32,19 +32,20 @@ object NutchExport {
 
     val parseDataInput = env.createInput(new HadoopInputFormat[Text, ParseData](new SequenceFileInputFormat[Text, ParseData], classOf[Text], classOf[ParseData], jobParseData))
 
-    val dir = new Path(params.getRequired("segs"))
-    val fs = dir.getFileSystem(jobCrawlDatum.getConfiguration);
-    val files = HadoopFSUtil.getPaths(fs.listStatus(dir, HadoopFSUtil.getPassDirectoriesFilter(fs)));
-    for (p <- files)
-      if (SegmentChecker.isIndexable(p, fs)) {
-        println("Add " + p)
-        org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(jobCrawlDatum, new Path(p, CrawlDatum.FETCH_DIR_NAME))
-        org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(jobCrawlDatum, new Path(p, CrawlDatum.PARSE_DIR_NAME))
-        org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(jobParseData, new Path(p, ParseData.DIR_NAME))
-        org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(jobParseData, new Path(p, ParseText.DIR_NAME))
+    val segmentIn = new Path(params.getRequired("segs"))
+    val fs = segmentIn.getFileSystem(jobCrawlDatum.getConfiguration);
+    val segments = HadoopFSUtil.getPaths(fs.listStatus(segmentIn, HadoopFSUtil.getPassDirectoriesFilter(fs)));
+    for (dir <- segments)
+      if (SegmentChecker.isIndexable(dir, fs)) {
+        println("Add " + dir)
+        org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(jobCrawlDatum, new Path(dir, CrawlDatum.FETCH_DIR_NAME))
+        org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(jobCrawlDatum, new Path(dir, CrawlDatum.PARSE_DIR_NAME))
+        org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(jobParseData, new Path(dir, ParseData.DIR_NAME))
+        org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(jobParseData, new Path(dir, ParseText.DIR_NAME))
       }
 
     val crawlMap = crawlDatumInput.flatMap((t: (Text, CrawlDatum), out: Collector[(String, NutchWritable)]) => {
+
       t match {
         case (id, datum) =>
           if (!(datum.getStatus() == CrawlDatum.STATUS_LINKED || datum.getStatus() == CrawlDatum.STATUS_SIGNATURE || datum.getStatus() == CrawlDatum.STATUS_PARSE_META))
