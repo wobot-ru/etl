@@ -21,7 +21,7 @@ import ru.wobot.sm.core.parse.ParseResult
 
 object NutchExport {
   def main(args: Array[String]): Unit = {
-    val startTime = System.currentTimeMillis();
+    val startTime = System.currentTimeMillis()
     val params: ParameterTool = ParameterTool.fromArgs(args)
     val env = ExecutionEnvironment.getExecutionEnvironment
     env.getConfig.enableForceKryo()
