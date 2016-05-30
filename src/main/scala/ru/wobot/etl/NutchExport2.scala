@@ -2,6 +2,7 @@ package ru.wobot.etl
 
 import com.google.gson.Gson
 import org.apache.flink.api.common.operators.Order
+import org.apache.flink.api.common.operators.base.JoinOperatorBase.JoinHint
 import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.api.scala.hadoop.mapreduce.HadoopInputFormat
 import org.apache.flink.api.scala.{DataSet, _}
@@ -30,6 +31,7 @@ object NutchExport2 {
     conf.setInteger(ConfigConstants.TASK_MANAGER_NETWORK_NUM_BUFFERS_KEY, ConfigConstants.DEFAULT_TASK_MANAGER_NETWORK_NUM_BUFFERS * 2);
     val env = ExecutionEnvironment.createLocalEnvironment(conf)
     env.getConfig.enableForceKryo()
+    env.getConfig.enableClosureCleaner()
 
     val jobCrawlDatum = org.apache.hadoop.mapreduce.Job.getInstance()
     val jobParseData = org.apache.hadoop.mapreduce.Job.getInstance()
@@ -64,6 +66,7 @@ object NutchExport2 {
 
 
     val union = list.reduce((a, b) => a.union(b))
+    //.distinct((t: (String, String, NutchWritable)) => (t._2, t._3.get().hashCode()))
     val map = union.groupBy(0).reduceGroup(fun = (tuples: Iterator[(String, String, NutchWritable)], out: Collector[((String, String), Post, Profile)]) => {
       val gson = new Gson()
       def fromJson[T](json: String, clazz: Class[T]): T = {
@@ -73,7 +76,8 @@ object NutchExport2 {
       var key: String = null
       val dic = collection.mutable.Map[String, NutchWritableContainer]()
 
-      for ((url, segment, data) <- tuples) {
+      val toArray: Array[(String, String, NutchWritable)] = tuples.toArray
+      for ((url, segment, data) <- toArray) {
         key = url
         val container = dic.getOrElseUpdate(segment, new NutchWritableContainer())
         data.get() match {
@@ -144,13 +148,13 @@ object NutchExport2 {
     })
 
 
-    val unic: DataSet[((String, String), Post, Profile)] = map.distinct(0)
+    val unic: DataSet[((String, String), Post, Profile)] = map
     val posts = unic.filter(x => x._2 != null).map((tuple: ((String, String), Post, Profile)) => (tuple._2.profileId, tuple._2))
     val profiles = unic.filter(x => x._3 != null).map((tuple: ((String, String), Post, Profile)) => (tuple._3.id, tuple._3))
     val latestProfiles: DataSet[(String, Profile)] = profiles.groupBy((tuple: (String, Profile)) => tuple._2.id).sortGroup((tuple: (String, Profile)) => tuple._2.crawlDate, Order.DESCENDING).first(1)
-    val latestPosts: DataSet[(String, Post)] = posts.groupBy((tuple: (String, Post)) => tuple._2.id).sortGroup((tuple: (String, Post)) => tuple._2.crawlDate, Order.DESCENDING).first(1)
+    val latestPosts: DataSet[(String, Post)] = posts.groupBy((tuple: (String, Post)) => tuple._2.id).sortGroup((tuple: (String, Post)) => tuple._2.crawlDate, Order.DESCENDING).first(1).rebalance()
 
-    val leftJoin = latestPosts.leftOuterJoin(latestProfiles).where(0).equalTo(0) {
+    val leftJoin = latestPosts.leftOuterJoin(latestProfiles, JoinHint.BROADCAST_HASH_SECOND).where(0).equalTo(0) {
       (left, right) =>
         val (_, post) = left
         if (right == null)
