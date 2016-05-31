@@ -27,11 +27,11 @@ object NutchExport2 {
   def main(args: Array[String]): Unit = {
     val startTime = System.currentTimeMillis()
     val params: ParameterTool = ParameterTool.fromArgs(args)
-    val conf = new org.apache.flink.configuration.Configuration();
-    conf.setInteger(ConfigConstants.TASK_MANAGER_NETWORK_NUM_BUFFERS_KEY, ConfigConstants.DEFAULT_TASK_MANAGER_NETWORK_NUM_BUFFERS * 2);
-    val env = ExecutionEnvironment.createLocalEnvironment(conf)
+    //    val conf = new org.apache.flink.configuration.Configuration();
+    //    conf.setInteger(ConfigConstants.TASK_MANAGER_NETWORK_NUM_BUFFERS_KEY, ConfigConstants.DEFAULT_TASK_MANAGER_NETWORK_NUM_BUFFERS * 2);
+    //    val env = ExecutionEnvironment.createLocalEnvironment(conf)
 
-    //    val env = ExecutionEnvironment.getExecutionEnvironment
+    val env = ExecutionEnvironment.getExecutionEnvironment
     env.getConfig.enableForceKryo()
 
     //env.getConfig.enableClosureCleaner()
@@ -63,10 +63,11 @@ object NutchExport2 {
 
         val crawlMap = crawlDatumInput.flatMap((t: (Text, CrawlDatum), out: Collector[(String, NutchWritable)]) => {
           val (id, datum) = t
-          if (!(datum.getStatus() == CrawlDatum.STATUS_LINKED || datum.getStatus() == CrawlDatum.STATUS_SIGNATURE || datum.getStatus() == CrawlDatum.STATUS_PARSE_META))
+          //if (!(datum.getStatus() == CrawlDatum.STATUS_LINKED || datum.getStatus() == CrawlDatum.STATUS_SIGNATURE || datum.getStatus() == CrawlDatum.STATUS_PARSE_META ))
+          if (datum.getStatus == CrawlDatum.STATUS_FETCH_SUCCESS)
             out.collect((id.toString, new NutchWritable(datum)))
         })
-        val parseMap = parseDataInput.flatMap((t: (Text, ParseData), out: Collector[(String, NutchWritable)]) => out.collect((t._1.toString, new NutchWritable(t._2))))
+        val parseMap = parseDataInput.flatMap((t: (Text, ParseData), out: Collector[(String, NutchWritable)]) => if (t._2.getStatus.isSuccess) out.collect((t._1.toString, new NutchWritable(t._2))))
         val textMap = parseTextInput.flatMap((t: (Text, ParseText), out: Collector[(String, NutchWritable)]) => out.collect((t._1.toString, new NutchWritable(t._2))))
 
         val u = crawlMap.union(parseMap).union(textMap)
@@ -93,7 +94,7 @@ object NutchExport2 {
               case _ => ()
             }
           }
-          if ((parseData != null && fetchDatum != null) && parseData.getStatus.isSuccess && fetchDatum.getStatus == CrawlDatum.STATUS_FETCH_SUCCESS) {
+          if (parseData != null && fetchDatum != null) {
             val contentMeta = parseData.getContentMeta;
             val skipFromElastic: String = contentMeta.get(ContentMetaConstants.SKIP_FROM_ELASTIC_INDEX)
             if (skipFromElastic == null || !skipFromElastic.equals("1")) {
