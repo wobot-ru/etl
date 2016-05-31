@@ -45,7 +45,6 @@ object NutchExport {
       }
 
     val crawlMap = crawlDatumInput.flatMap((t: (Text, CrawlDatum), out: Collector[(String, NutchWritable)]) => {
-
       t match {
         case (id, datum) =>
           if (!(datum.getStatus() == CrawlDatum.STATUS_LINKED || datum.getStatus() == CrawlDatum.STATUS_SIGNATURE || datum.getStatus() == CrawlDatum.STATUS_PARSE_META))
