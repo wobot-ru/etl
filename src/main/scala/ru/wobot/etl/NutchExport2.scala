@@ -27,11 +27,13 @@ object NutchExport2 {
   def main(args: Array[String]): Unit = {
     val startTime = System.currentTimeMillis()
     val params: ParameterTool = ParameterTool.fromArgs(args)
-    //    val conf = new org.apache.flink.configuration.Configuration();
-    //    conf.setInteger(ConfigConstants.TASK_MANAGER_NETWORK_NUM_BUFFERS_KEY, ConfigConstants.DEFAULT_TASK_MANAGER_NETWORK_NUM_BUFFERS * 2);
-    //    val env = ExecutionEnvironment.createLocalEnvironment(conf)
-    val env = ExecutionEnvironment.getExecutionEnvironment
+    val conf = new org.apache.flink.configuration.Configuration();
+    conf.setInteger(ConfigConstants.TASK_MANAGER_NETWORK_NUM_BUFFERS_KEY, ConfigConstants.DEFAULT_TASK_MANAGER_NETWORK_NUM_BUFFERS * 2);
+    val env = ExecutionEnvironment.createLocalEnvironment(conf)
+
+    //    val env = ExecutionEnvironment.getExecutionEnvironment
     env.getConfig.enableForceKryo()
+
     //env.getConfig.enableClosureCleaner()
 
     val jobCrawlDatum = org.apache.hadoop.mapreduce.Job.getInstance()
@@ -46,8 +48,8 @@ object NutchExport2 {
     val fs = segmentIn.getFileSystem(jobCrawlDatum.getConfiguration);
     val segments = HadoopFSUtil.getPaths(fs.listStatus(segmentIn, HadoopFSUtil.getPassDirectoriesFilter(fs)))
     //val list = new ListBuffer[DataSet[((String, String), Option[Post], Option[Profile])]]()
-    val profileList = new ListBuffer[DataSet[(String, String, Profile)]]()
-    val postList = new ListBuffer[DataSet[(String, String, Post)]]()
+    val profileList = new ListBuffer[DataSet[(String, Long, Profile)]]()
+    val postList = new ListBuffer[DataSet[(String, Long, Post)]]()
     for (dir <- segments)
       if (SegmentChecker.isIndexable(dir, fs)) {
         if (SegmentChecker.isIndexable(dir, fs)) {
@@ -69,7 +71,7 @@ object NutchExport2 {
 
         val u = crawlMap.union(parseMap).union(textMap)
 
-        val map = u.groupBy(0).reduceGroup((tuples: Iterator[(String, NutchWritable)], out: Collector[(String, String, Option[Post], Option[Profile])]) => {
+        val map = u.groupBy(0).reduceGroup((tuples: Iterator[(String, NutchWritable)], out: Collector[(String, Long, Option[Post], Option[Profile])]) => {
           val gson = new Gson()
           def fromJson[T](json: String, clazz: Class[T]): T = {
             return gson.fromJson(json, clazz)
@@ -81,9 +83,11 @@ object NutchExport2 {
           var parseText: ParseText = null
 
           for ((url, data) <- tuples) {
-            key = url
             data.get() match {
-              case c: CrawlDatum => fetchDatum = c
+              case c: CrawlDatum => {
+                key = url
+                fetchDatum = c
+              }
               case d: ParseData => parseData = d
               case t: ParseText => parseText = t
               case _ => ()
@@ -93,7 +97,8 @@ object NutchExport2 {
             val contentMeta = parseData.getContentMeta;
             val skipFromElastic: String = contentMeta.get(ContentMetaConstants.SKIP_FROM_ELASTIC_INDEX)
             if (skipFromElastic == null || !skipFromElastic.equals("1")) {
-              val crawlDate: String = fetchDatum.getFetchTime.toString
+              val fetchTime: Long = fetchDatum.getFetchTime
+              val crawlDate: String = fetchTime.toString
               val segment = contentMeta.get(Nutch.SEGMENT_NAME_KEY);
               val isSingleDoc: Boolean = !"true".equals(contentMeta.get(ContentMetaConstants.MULTIPLE_PARSE_RESULT))
               if (isSingleDoc) {
@@ -111,8 +116,8 @@ object NutchExport2 {
                   profile.city = parseMeta.get(ProfileProperties.CITY)
                   profile.gender = parseMeta.get(ProfileProperties.GENDER)
                   profile.reach = parseMeta.get(ProfileProperties.REACH)
-                  if (profile.id != null && crawlDate != null)
-                    out.collect(profile.id, crawlDate, None, Some(profile))
+                  //if (crawlDate != null)
+                  out.collect(profile.id, fetchTime, None, Some(profile))
                 }
               }
               else if (parseText != null) {
@@ -137,8 +142,8 @@ object NutchExport2 {
                       post.isComment = parseMeta.get(PostProperties.IS_COMMENT).asInstanceOf[Boolean]
                       post.engagement = String.valueOf(parseMeta.get(PostProperties.ENGAGEMENT)).replace(".0", "")
                       post.parentPostId = parseMeta.get(PostProperties.PARENT_POST_ID).asInstanceOf[String]
-                      if (post.id != null && crawlDate != null)
-                        out.collect(post.id, crawlDate, Some(post), None)
+                      //if (crawlDate != null)
+                      out.collect(post.id, fetchTime, Some(post), None)
                     }
                   }
                 }
@@ -146,36 +151,36 @@ object NutchExport2 {
             }
           }
         })
-        postList += map.filter(x => x._3.isDefined).map((tuple: (String, String, Option[Post], Option[Profile])) => (tuple._1, tuple._2, tuple._3.get))
-        profileList += map.filter(x => x._4.isDefined).map((tuple: (String, String, Option[Post], Option[Profile])) => (tuple._1, tuple._2, tuple._4.get))
+        postList += map.filter(x => x._3.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, tuple._3.get))
+        profileList += map.filter(x => x._4.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, tuple._4.get))
       }
 
 
-    val posts = postList.reduce((a, b) => a.union(b))
-    val profiles = profileList.reduce((a, b) => a.union(b))
+    val posts = postList.reduce((a, b) => a.union(b)).distinct(0, 1)
+    val profiles = profileList.reduce((a, b) => a.union(b)).distinct(0, 1)
     //val latestProfiles: DataSet[(String, Profile)] = profiles.groupBy((tuple: (String, Profile)) => tuple._1).sortGroup((tuple: (String, Profile)) => tuple._2.crawlDate, Order.DESCENDING).first(1)
     val latestProfiles: DataSet[(String, Profile)] = profiles.groupBy(_._1).sortGroup(_._2, Order.DESCENDING).first(1).map(x => (x._1, x._3))
     //val latestPosts: DataSet[(String, Post)] = posts.groupBy((tuple: (String, Post)) => tuple._1).sortGroup((tuple: (String, Post)) => tuple._2.crawlDate, Order.DESCENDING).first(1).rebalance()
-    val latestPosts: DataSet[(String, Post)] = posts.groupBy(_._1).sortGroup(_._2, Order.DESCENDING).first(1).map(x => (x._1, x._3))
+    val latestPosts: DataSet[(String, Post)] = posts.groupBy(_._1).sortGroup(_._2, Order.DESCENDING).first(1).map(x => (x._3.profileId, x._3))
 
     val leftJoin = latestPosts.leftOuterJoin(latestProfiles).where(0).equalTo(0) {
       (left, right) =>
         val (_, post) = left
         if (right == null)
-          (post.id, post, Option.empty)
+          (post.id, post, None)
         else {
           val (_, profile) = right
           (post.id, post, Option(profile))
         }
-    }
+    }.sortPartition(_._1, Order.ASCENDING)
     val postsWithoutProfile = leftJoin.filter(x => x._3.isEmpty).map(x => (x._1, x._2))
     val postsWithProfile = leftJoin.filter(x => x._3.isDefined).map(x => (x._1, x._2, x._3.get))
 
     def toCsvPath(out: String) = new Path(params.getRequired("csv"), out).toString
-    //profiles.writeAsCsv(toCsvPath("profiles"), writeMode = WriteMode.OVERWRITE)
-    latestProfiles.writeAsCsv(toCsvPath("latest-profiles"), writeMode = WriteMode.OVERWRITE)
-    //latestPosts.writeAsCsv(toCsvPath("latest-posts"), writeMode = WriteMode.OVERWRITE)
-    //posts.writeAsCsv(toCsvPath("posts"), writeMode = WriteMode.OVERWRITE)
+    profiles.sortPartition(_._1, Order.ASCENDING).writeAsCsv(toCsvPath("profiles"), writeMode = WriteMode.OVERWRITE)
+    //latestProfiles.sortPartition(_._1, Order.ASCENDING).writeAsCsv(toCsvPath("latest-profiles"), writeMode = WriteMode.OVERWRITE)
+    //latestPosts.sortPartition(_._1, Order.ASCENDING).writeAsCsv(toCsvPath("latest-posts"), writeMode = WriteMode.OVERWRITE)
+    //posts.sortPartition(_._1, Order.ASCENDING).writeAsCsv(toCsvPath("posts"), writeMode = WriteMode.OVERWRITE)
     postsWithProfile.writeAsCsv(toCsvPath("posts-and-profiles"), writeMode = WriteMode.OVERWRITE)
     postsWithoutProfile.writeAsCsv(toCsvPath("posts-without-profiles"), writeMode = WriteMode.OVERWRITE)
 
@@ -190,7 +195,7 @@ object NutchExport2 {
     //
     //    println("latestProfiles.count()==" + latestProfilesCount)
     //    //println("latestPostsCount.count()==" + latestPostsCount)
-    //    //println("profiles.count()==" + profilesCount)
+    //    println("profiles.count()==" + profilesCount)
     //    //println("posts.count()=" + postCount)
     //    println("postWithoutProfiles.count()=" + postsWithoutProfileCount)
     //    println("postsWithProfile.count()==" + postsWithProfileCount)
