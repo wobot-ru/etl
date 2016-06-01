@@ -90,6 +90,11 @@ under the License.
 			<artifactId>flink-clients_${scala.binary.version}</artifactId>
 			<version>${flink.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-connector-kafka-0.9_${scala.binary.version}</artifactId>
+			<version>${flink.version}</version>
+		</dependency>
 		<!--<dependency>-->
 			<!--<groupId>org.apache.hadoop</groupId>-->
 			<!--<artifactId>hadoop-mapreduce-client-core</artifactId>-->
