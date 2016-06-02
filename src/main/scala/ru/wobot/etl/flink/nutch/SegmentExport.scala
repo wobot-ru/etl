@@ -20,7 +20,7 @@ import org.apache.nutch.metadata.{Metadata, Nutch}
 import org.apache.nutch.parse.{ParseData, ParseText}
 import org.apache.nutch.segment.SegmentChecker
 import org.apache.nutch.util.{HadoopFSUtil, StringUtil}
-import ru.wobot.etl.{Post, Profile}
+import ru.wobot.etl.{JsonUtil, Post, Profile}
 import ru.wobot.sm.core.mapping.{PostProperties, ProfileProperties}
 import ru.wobot.sm.core.meta.ContentMetaConstants
 import ru.wobot.sm.core.parse.ParseResult
@@ -173,11 +173,11 @@ object SegmentExport {
       val profilePath = new Path(segmentPath, "parse-profiles").toString
 
       val unic: DataSet[(String, Long, Option[Post], Option[Profile])] = data.distinct(0, 1)
-      val posts = unic.filter(x => x._3.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, tuple._3.get)).sortPartition(0, Order.ASCENDING)
-      val profiles = unic.filter(x => x._4.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, tuple._4.get)).sortPartition(0, Order.ASCENDING)
+      val posts = unic.filter(x => x._3.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, JsonUtil.toJson(tuple._3.get))).sortPartition(0, Order.ASCENDING)
+      val profiles = unic.filter(x => x._4.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2,  JsonUtil.toJson(tuple._4.get))).sortPartition(0, Order.ASCENDING)
 
-      posts.write(new TypeSerializerOutputFormat[(String, Long, Post)], postPath, WriteMode.OVERWRITE)
-      profiles.write(new TypeSerializerOutputFormat[(String, Long, Profile)], profilePath, WriteMode.OVERWRITE)
+      posts.write(new TypeSerializerOutputFormat[(String, Long, String)], postPath, WriteMode.OVERWRITE)
+      profiles.write(new TypeSerializerOutputFormat[(String, Long, String)], profilePath, WriteMode.OVERWRITE)
       //      posts.writeAsCsv(postPath, writeMode = WriteMode.OVERWRITE)
       //      profiles.writeAsCsv(profilePath, writeMode = WriteMode.OVERWRITE)
 
