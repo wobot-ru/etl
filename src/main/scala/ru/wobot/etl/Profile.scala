@@ -10,5 +10,5 @@ class Profile extends Indexable {
   var followerCount: String = _
   var gender: String = _
 
-  override def toString: String = JsonUtil.toJson(this)
+  //override def toString: String = JsonUtil.toJson(this)
 }

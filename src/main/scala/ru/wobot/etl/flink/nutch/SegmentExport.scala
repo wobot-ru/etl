@@ -2,10 +2,14 @@ package ru.wobot.etl.flink.nutch
 
 import com.google.gson.Gson
 import org.apache.flink.api.common.operators.Order
+import org.apache.flink.api.common.typeinfo.TypeInformation
+import org.apache.flink.api.java.io.{TypeSerializerInputFormat, TypeSerializerOutputFormat}
 import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.api.scala.hadoop.mapreduce.HadoopInputFormat
+import org.apache.flink.api.scala.typeutils.CaseClassTypeInfo
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment, _}
 import org.apache.flink.core.fs.FileSystem.WriteMode
+import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
 import org.apache.flink.util.Collector
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.io.{Text, Writable}
@@ -21,11 +25,15 @@ import ru.wobot.sm.core.mapping.{PostProperties, ProfileProperties}
 import ru.wobot.sm.core.meta.ContentMetaConstants
 import ru.wobot.sm.core.parse.ParseResult
 
+//import org.apache.flink.api.scala.typeutils._
+
 object SegmentExport {
-  val env = ExecutionEnvironment.getExecutionEnvironment
+  val batch = ExecutionEnvironment.getExecutionEnvironment
+  val stream = StreamExecutionEnvironment.getExecutionEnvironment
 
   def main(args: Array[String]): Unit = {
-    env.getConfig.enableForceKryo()
+    batch.getConfig.enableForceKryo()
+    stream.getConfig.enableForceKryo()
 
     val startTime = System.currentTimeMillis()
     val params: ParameterTool = ParameterTool.fromArgs(args)
@@ -41,11 +49,24 @@ object SegmentExport {
         addSegment(dir)
       }
     }
+    //stream.execute("Publish to kafka...")
+    try {
+      batch.execute("Exporting data from segments...")
 
-    env.execute("Exporting data from segments...")
-    val elapsedTime = System.currentTimeMillis() - startTime
-    println("elapsedTime=" + elapsedTime)
+    }
+    catch {
+      case e: RuntimeException =>
+        if (!"No new data sinks have been defined since the last execution. The last execution refers to the latest call to 'execute()', 'count()', 'collect()', or 'print()'."
+          .eq(e.getMessage))
+          throw e
+    }
+    finally {
+      val elapsedTime = System.currentTimeMillis() - startTime
+      println("Export finish, elapsedTime=" + elapsedTime)
+    }
   }
+
+  implicit val information = createTypeInformation[(String, Long, String)].asInstanceOf[CaseClassTypeInfo[(String, Long, String)]]
 
   def addSegment(segmentPath: Path): Unit = {
     val exportJob = org.apache.hadoop.mapreduce.Job.getInstance()
@@ -57,7 +78,7 @@ object SegmentExport {
       org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(exportJob, new Path(segmentPath, ParseData.DIR_NAME))
       org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(exportJob, new Path(segmentPath, ParseText.DIR_NAME))
 
-      val input = env.createInput(new HadoopInputFormat[Text, NutchWritable](new SequenceFileInputFormat[Text, NutchWritable], classOf[Text], classOf[NutchWritable], exportJob))
+      val input = batch.createInput(new HadoopInputFormat[Text, NutchWritable](new SequenceFileInputFormat[Text, NutchWritable], classOf[Text], classOf[NutchWritable], exportJob))
       val map = input.flatMap((t: (Text, Writable), out: Collector[(Text, NutchWritable)]) => {
         t._2 match {
           case c: CrawlDatum => if (c.getStatus == CrawlDatum.STATUS_FETCH_SUCCESS) out.collect((t._1, new NutchWritable(t._2)))
@@ -148,11 +169,29 @@ object SegmentExport {
         }
       })
 
+      val postPath = new Path(segmentPath, "parse-posts").toString
+      val profilePath = new Path(segmentPath, "parse-profiles").toString
+
       val unic: DataSet[(String, Long, Option[Post], Option[Profile])] = data.distinct(0, 1)
-      val posts = unic.filter(x => x._3.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, tuple._3.get))
-      val profiles = unic.filter(x => x._4.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, tuple._4.get))
-      posts.sortPartition(0, Order.ASCENDING).writeAsCsv(new Path(segmentPath, "posts").toString, writeMode = WriteMode.OVERWRITE)
-      profiles.sortPartition(0, Order.ASCENDING).writeAsCsv(new Path(segmentPath, "profiles").toString, writeMode = WriteMode.OVERWRITE)
+      val posts = unic.filter(x => x._3.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, tuple._3.get)).sortPartition(0, Order.ASCENDING)
+      val profiles = unic.filter(x => x._4.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, tuple._4.get)).sortPartition(0, Order.ASCENDING)
+
+      posts.write(new TypeSerializerOutputFormat[(String, Long, Post)], postPath, WriteMode.OVERWRITE)
+      profiles.write(new TypeSerializerOutputFormat[(String, Long, Profile)], profilePath, WriteMode.OVERWRITE)
+      //      posts.writeAsCsv(postPath, writeMode = WriteMode.OVERWRITE)
+      //      profiles.writeAsCsv(profilePath, writeMode = WriteMode.OVERWRITE)
+
+      //val format = new TupleCsvInputFormat[(String, Long, String)](new org.apache.flink.core.fs.Path(profilePath), information)
+      //val profileStream = stream.createInput(format)
+      //val profileStream2: DataStream[(String, Long, Profile)] = stream.createInput(new TypeSerializerInputFormat[(String, Long, Profile)](TypeInformation.of(classOf[(String, Long, Profile)])))
+//      val profileStream: DataStream[(String, Long, Profile)] = stream.readFile(new TypeSerializerInputFormat[(String, Long, Profile)](TypeInformation.of(classOf[(String, Long, Profile)])), profilePath)
+//      profileStream.print()
+//      val out: String = s"file:////c:\\tmp\\flink\\${segmentPath.getName}\\stream-out"
+//      val outputFormat: TypeSerializerOutputFormat[(String, Long, Profile)] = new TypeSerializerOutputFormat[(String, Long, Profile)]
+//      outputFormat.setOutputFilePath(new core.fs.Path(out))
+//      profileStream.writeUsingOutputFormat(outputFormat)
+      //      println(s"Add ${postCsv.getDataSet.count()}  posts")
+      //      println(s"Add ${profileCsv.getDataSet.count()}  profiles")
     }
   }
 }
