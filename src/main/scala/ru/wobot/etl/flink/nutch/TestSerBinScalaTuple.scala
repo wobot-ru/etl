@@ -13,7 +13,7 @@ object TestSerBinScalaTuple {
 
   def main(args: Array[String]): Unit = {
     val batch = ExecutionEnvironment.getExecutionEnvironment
-    batch.getConfig.enableForceKryo()
+    //batch.getConfig.enableForceKryo()
 
     val set: DataSet[(String, Long, Profile)] = batch.fromElements(
       ("id1", 123l, Profiles.p1),
