@@ -3,6 +3,7 @@ package ru.wobot.etl.flink.nutch
 import org.apache.flink.api.common.typeinfo.{BasicTypeInfo, TypeInformation}
 import org.apache.flink.api.java.io.{TypeSerializerInputFormat, TypeSerializerOutputFormat}
 import org.apache.flink.api.java.tuple
+import org.apache.flink.api.java.tuple.Tuple3
 import org.apache.flink.api.java.typeutils.TupleTypeInfo
 import org.apache.flink.api.scala._
 import org.apache.flink.core.fs.FileSystem.WriteMode
@@ -23,7 +24,10 @@ object BatchSerJava {
     val ti = new TupleTypeInfo[tuple.Tuple3[String, Long, String]](
       BasicTypeInfo.STRING_TYPE_INFO,
       BasicTypeInfo.LONG_TYPE_INFO, BasicTypeInfo.STRING_TYPE_INFO)
-    val file: DataSet[tuple.Tuple3[String, Long, String]] = batch.readFile(new TypeSerializerInputFormat[tuple.Tuple3[String, Long, String]](ti), tmpPath)
+    val format: TypeSerializerInputFormat[Tuple3[String, Long, String]] = new TypeSerializerInputFormat[Tuple3[String, Long, String]](ti)
+    format.setFilePath(tmpPath)
+    val file: DataSet[tuple.Tuple3[String, Long, String]] = batch.readFile(format, tmpPath)
+    batch.createInput(format)
     file.print()
   }
 }

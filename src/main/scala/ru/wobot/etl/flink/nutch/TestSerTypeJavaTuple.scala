@@ -3,33 +3,28 @@ package ru.wobot.etl.flink.nutch
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo
 import org.apache.flink.api.java.io.{TypeSerializerInputFormat, TypeSerializerOutputFormat}
 import org.apache.flink.api.java.tuple
+import org.apache.flink.api.java.tuple.Tuple3
 import org.apache.flink.api.java.typeutils.{TupleTypeInfo, TypeExtractor}
 import org.apache.flink.api.scala._
 import org.apache.flink.core.fs.FileSystem.WriteMode
 import ru.wobot.etl.Profile
 
-object BatchSerJavaProfiles {
+object TestSerTypeJavaTuple {
 
   val profilePath = "file:////C:\\crawl\\segments\\20160527231730\\parse-profiles"
-  val tmpPath = "file:////C:\\tmp\\flink\\seq"
+  val tmpPath = "file:////C:\\tmp\\flink\\seq-java-tuple"
 
   def main(args: Array[String]): Unit = {
     val batch = ExecutionEnvironment.getExecutionEnvironment
-    batch.getConfig.enableForceKryo()
-
-    val p1: Profile = new Profile()
-    p1.id="vk://id1"
-    val p2: Profile = new Profile()
-    p2.id="vk://id2"
-    val p3: Profile = new Profile()
-    p3.id="vk://id3"
+    //batch.getConfig.enableForceKryo()
 
     val set: DataSet[tuple.Tuple3[String, Long, Profile]] = batch.fromElements(
-      new tuple.Tuple3[String, Long, Profile]("id1", 123l, p1),
-      new tuple.Tuple3[String, Long, Profile]("id2", 124l, p2),
-      new tuple.Tuple3[String, Long, Profile]("id3", 1245l, p3)
+      new tuple.Tuple3[String, Long, Profile]("id1", 123l, Profiles.p1),
+      new tuple.Tuple3[String, Long, Profile]("id2", 124l, Profiles.p2),
+      new tuple.Tuple3[String, Long, Profile]("id3", 1245l, Profiles.p3)
     )
-    set.write(new TypeSerializerOutputFormat[tuple.Tuple3[String, Long, Profile]], tmpPath, WriteMode.OVERWRITE)
+    val format: TypeSerializerOutputFormat[Tuple3[String, Long, Profile]] = new TypeSerializerOutputFormat[Tuple3[String, Long, Profile]]
+    set.write(format, tmpPath, WriteMode.OVERWRITE)
     set.print()
     System.in.read()
     //batch.execute("Writing")

@@ -1,14 +1,18 @@
 package ru.wobot.etl
 
 
-class Profile extends Indexable {
-  var smProfileId: String = _
-  var name: String = _
-  var city: String = _
-  var reach: String = _
-  var friendCount: String = _
-  var followerCount: String = _
-  var gender: String = _
+class Profile(val id: String,
+              val segment: String,
+              val crawlDate: String,
+              val href: String,
+              val source: String,
+              val smProfileId: String,
+              val name: String,
+              val city: String,
+              val reach: String,
+              val friendCount: String,
+              val followerCount: String,
+              val gender: String) {
 
   override def toString: String = JsonUtil.toJson(this)
 }

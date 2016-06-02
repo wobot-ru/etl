@@ -122,18 +122,19 @@ object SegmentExport {
               val parseMeta: Metadata = parseData.getParseMeta
               val subType = contentMeta.get(ContentMetaConstants.TYPE);
               if (subType != null && subType.equals(ru.wobot.sm.core.mapping.Types.PROFILE)) {
-                val profile = new Profile();
-                profile.id = key
-                profile.segment = segment
-                profile.crawlDate = crawlDate
-                profile.source = parseMeta.get(ProfileProperties.SOURCE)
-                profile.name = parseMeta.get(ProfileProperties.NAME)
-                profile.href = parseMeta.get(ProfileProperties.HREF)
-                profile.smProfileId = parseMeta.get(ProfileProperties.SM_PROFILE_ID)
-                profile.city = parseMeta.get(ProfileProperties.CITY)
-                profile.gender = parseMeta.get(ProfileProperties.GENDER)
-                profile.reach = parseMeta.get(ProfileProperties.REACH)
-                //if (crawlDate != null)
+                val profile = new Profile(key,
+                  segment,
+                  crawlDate,
+                  parseMeta.get(ProfileProperties.HREF),
+                  parseMeta.get(ProfileProperties.SOURCE),
+                  parseMeta.get(ProfileProperties.SM_PROFILE_ID),
+                  parseMeta.get(ProfileProperties.NAME),
+                  parseMeta.get(ProfileProperties.CITY),
+                  parseMeta.get(ProfileProperties.REACH),
+                  parseMeta.get(ProfileProperties.FRIEND_COUNT),
+                  parseMeta.get(ProfileProperties.FOLLOWER_COUNT),
+                  parseMeta.get(ProfileProperties.GENDER)
+                )
                 out.collect(profile.id, fetchTime, None, Some(profile))
               }
             }
@@ -146,19 +147,20 @@ object SegmentExport {
                   if (subType == null) subType = parseData.getContentMeta.get(ContentMetaConstants.TYPE)
                   if (subType == ru.wobot.sm.core.mapping.Types.POST) {
                     val parseMeta = parseResult.getParseMeta
-                    val post = new Post()
-                    post.id = parseResult.getUrl
-                    post.crawlDate = crawlDate
-                    post.segment = segment
-                    post.source = parseMeta.get(ProfileProperties.SOURCE).asInstanceOf[String]
-                    post.profileId = parseMeta.get(PostProperties.PROFILE_ID).asInstanceOf[String]
-                    post.href = parseMeta.get(PostProperties.HREF).asInstanceOf[String]
-                    post.smPostId = String.valueOf(parseMeta.get(PostProperties.SM_POST_ID)).replace(".0", "")
-                    post.body = parseMeta.get(PostProperties.BODY).asInstanceOf[String]
-                    post.date = parseMeta.get(PostProperties.POST_DATE).asInstanceOf[String]
-                    post.isComment = parseMeta.get(PostProperties.IS_COMMENT).asInstanceOf[Boolean]
-                    post.engagement = String.valueOf(parseMeta.get(PostProperties.ENGAGEMENT)).replace(".0", "")
-                    post.parentPostId = parseMeta.get(PostProperties.PARENT_POST_ID).asInstanceOf[String]
+                    val post = new Post(id = parseResult.getUrl,
+                      segment = segment,
+                      crawlDate = crawlDate,
+                      href = parseResult.getUrl,
+                      source = parseMeta.get(ProfileProperties.SOURCE).asInstanceOf[String],
+                      profileId = parseMeta.get(PostProperties.PROFILE_ID).asInstanceOf[String],
+                      smPostId = String.valueOf(parseMeta.get(PostProperties.SM_POST_ID)).replace(".0", ""),
+                      parentPostId = parseMeta.get(PostProperties.PARENT_POST_ID).asInstanceOf[String],
+                      body = parseMeta.get(PostProperties.BODY).asInstanceOf[String],
+                      date = parseMeta.get(PostProperties.POST_DATE).asInstanceOf[String],
+                      engagement = String.valueOf(parseMeta.get(PostProperties.ENGAGEMENT)).replace(".0", ""),
+                      isComment = parseMeta.get(PostProperties.IS_COMMENT).asInstanceOf[Boolean]
+                    )
+
                     //if (crawlDate != null)
                     out.collect(post.id, fetchTime, Some(post), None)
                   }
@@ -174,7 +176,7 @@ object SegmentExport {
 
       val unic: DataSet[(String, Long, Option[Post], Option[Profile])] = data.distinct(0, 1)
       val posts = unic.filter(x => x._3.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, JsonUtil.toJson(tuple._3.get))).sortPartition(0, Order.ASCENDING)
-      val profiles = unic.filter(x => x._4.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2,  JsonUtil.toJson(tuple._4.get))).sortPartition(0, Order.ASCENDING)
+      val profiles = unic.filter(x => x._4.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, JsonUtil.toJson(tuple._4.get))).sortPartition(0, Order.ASCENDING)
 
       posts.write(new TypeSerializerOutputFormat[(String, Long, String)], postPath, WriteMode.OVERWRITE)
       profiles.write(new TypeSerializerOutputFormat[(String, Long, String)], profilePath, WriteMode.OVERWRITE)
@@ -184,12 +186,12 @@ object SegmentExport {
       //val format = new TupleCsvInputFormat[(String, Long, String)](new org.apache.flink.core.fs.Path(profilePath), information)
       //val profileStream = stream.createInput(format)
       //val profileStream2: DataStream[(String, Long, Profile)] = stream.createInput(new TypeSerializerInputFormat[(String, Long, Profile)](TypeInformation.of(classOf[(String, Long, Profile)])))
-//      val profileStream: DataStream[(String, Long, Profile)] = stream.readFile(new TypeSerializerInputFormat[(String, Long, Profile)](TypeInformation.of(classOf[(String, Long, Profile)])), profilePath)
-//      profileStream.print()
-//      val out: String = s"file:////c:\\tmp\\flink\\${segmentPath.getName}\\stream-out"
-//      val outputFormat: TypeSerializerOutputFormat[(String, Long, Profile)] = new TypeSerializerOutputFormat[(String, Long, Profile)]
-//      outputFormat.setOutputFilePath(new core.fs.Path(out))
-//      profileStream.writeUsingOutputFormat(outputFormat)
+      //      val profileStream: DataStream[(String, Long, Profile)] = stream.readFile(new TypeSerializerInputFormat[(String, Long, Profile)](TypeInformation.of(classOf[(String, Long, Profile)])), profilePath)
+      //      profileStream.print()
+      //      val out: String = s"file:////c:\\tmp\\flink\\${segmentPath.getName}\\stream-out"
+      //      val outputFormat: TypeSerializerOutputFormat[(String, Long, Profile)] = new TypeSerializerOutputFormat[(String, Long, Profile)]
+      //      outputFormat.setOutputFilePath(new core.fs.Path(out))
+      //      profileStream.writeUsingOutputFormat(outputFormat)
       //      println(s"Add ${postCsv.getDataSet.count()}  posts")
       //      println(s"Add ${profileCsv.getDataSet.count()}  profiles")
     }
