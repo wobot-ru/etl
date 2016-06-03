@@ -8,6 +8,7 @@ import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.api.scala.hadoop.mapreduce.HadoopInputFormat
 import org.apache.flink.api.scala.typeutils.CaseClassTypeInfo
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment, _}
+import org.apache.flink.core
 import org.apache.flink.core.fs.FileSystem.WriteMode
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
 import org.apache.flink.util.Collector
@@ -30,6 +31,10 @@ import ru.wobot.sm.core.parse.ParseResult
 object SegmentExport {
   val batch = ExecutionEnvironment.getExecutionEnvironment
   val stream = StreamExecutionEnvironment.getExecutionEnvironment
+  implicit val profileTI = createTypeInformation[(String, Long, Profile)].asInstanceOf[CaseClassTypeInfo[(String, Long, Profile)]]
+  val postOutFormat: TypeSerializerOutputFormat[(String, Long, Post)] = new TypeSerializerOutputFormat[(String, Long, Post)]
+  val profileInFormat = new TypeSerializerInputFormat[(String, Long, Profile)](profileTI)
+  val profileOutFormat: TypeSerializerOutputFormat[(String, Long, Profile)] = new TypeSerializerOutputFormat[(String, Long, Profile)]
 
   def main(args: Array[String]): Unit = {
     batch.getConfig.enableForceKryo()
@@ -49,10 +54,9 @@ object SegmentExport {
         addSegment(dir)
       }
     }
-    //stream.execute("Publish to kafka...")
     try {
       batch.execute("Exporting data from segments...")
-
+      stream.execute("Publish to kafka...")
     }
     catch {
       case e: RuntimeException =>
@@ -66,11 +70,11 @@ object SegmentExport {
     }
   }
 
-  implicit val information = createTypeInformation[(String, Long, String)].asInstanceOf[CaseClassTypeInfo[(String, Long, String)]]
+
 
   def addSegment(segmentPath: Path): Unit = {
     val exportJob = org.apache.hadoop.mapreduce.Job.getInstance()
-    val fs = segmentPath.getFileSystem(exportJob.getConfiguration);
+    val fs = segmentPath.getFileSystem(exportJob.getConfiguration)
     if (SegmentChecker.isIndexable(segmentPath, fs)) {
       println("Export segment: " + segmentPath)
       org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(exportJob, new Path(segmentPath, CrawlDatum.FETCH_DIR_NAME))
@@ -178,22 +182,14 @@ object SegmentExport {
       val posts = unic.filter(x => x._3.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, tuple._3.get))
       val profiles = unic.filter(x => x._4.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, tuple._4.get))
 
-      posts.write(new TypeSerializerOutputFormat[(String, Long, Post)], postPath, WriteMode.OVERWRITE)
-      profiles.write(new TypeSerializerOutputFormat[(String, Long, Profile)], profilePath, WriteMode.OVERWRITE)
-      //      posts.writeAsCsv(postPath, writeMode = WriteMode.OVERWRITE)
-      //      profiles.writeAsCsv(profilePath, writeMode = WriteMode.OVERWRITE)
+      posts.write(postOutFormat, postPath, WriteMode.OVERWRITE)
+      profiles.write(profileOutFormat, profilePath, WriteMode.OVERWRITE)
 
-      //val format = new TupleCsvInputFormat[(String, Long, String)](new org.apache.flink.core.fs.Path(profilePath), information)
-      //val profileStream = stream.createInput(format)
-      //val profileStream2: DataStream[(String, Long, Profile)] = stream.createInput(new TypeSerializerInputFormat[(String, Long, Profile)](TypeInformation.of(classOf[(String, Long, Profile)])))
-      //      val profileStream: DataStream[(String, Long, Profile)] = stream.readFile(new TypeSerializerInputFormat[(String, Long, Profile)](TypeInformation.of(classOf[(String, Long, Profile)])), profilePath)
-      //      profileStream.print()
-      //      val out: String = s"file:////c:\\tmp\\flink\\${segmentPath.getName}\\stream-out"
-      //      val outputFormat: TypeSerializerOutputFormat[(String, Long, Profile)] = new TypeSerializerOutputFormat[(String, Long, Profile)]
-      //      outputFormat.setOutputFilePath(new core.fs.Path(out))
-      //      profileStream.writeUsingOutputFormat(outputFormat)
-      //      println(s"Add ${postCsv.getDataSet.count()}  posts")
-      //      println(s"Add ${profileCsv.getDataSet.count()}  profiles")
+      val profileStream = stream.readFile(profileInFormat, profilePath)
+      val out = new TypeSerializerOutputFormat[(String, Long, Profile)]
+      out.setOutputFilePath(new core.fs.Path(s"file:////c:\\tmp\\flink\\${segmentPath.getName}"))
+      out.setWriteMode(WriteMode.OVERWRITE)
+      profileStream.writeUsingOutputFormat(out)
     }
   }
 }

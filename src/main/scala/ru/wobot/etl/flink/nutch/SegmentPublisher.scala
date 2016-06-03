@@ -60,6 +60,7 @@ object SegmentPublisher {
     messageStream.addSink(new FlinkKafkaProducer09[Long](topicName, typeInformationSerializationSchema, properties))
     val deliveryStream = env.addSource(new FlinkKafkaConsumer09[Long](topicName, typeInformationSerializationSchema, properties))
     deliveryStream.print()
+    env.execute("publish")
 
     //    if (params.has("seg"))
     //      addSegment(new Path(params.getRequired("seg")))
