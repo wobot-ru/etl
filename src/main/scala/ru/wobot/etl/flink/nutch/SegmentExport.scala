@@ -174,12 +174,12 @@ object SegmentExport {
       val postPath = new Path(segmentPath, "parse-posts").toString
       val profilePath = new Path(segmentPath, "parse-profiles").toString
 
-      val unic: DataSet[(String, Long, Option[Post], Option[Profile])] = data.distinct(0, 1)
-      val posts = unic.filter(x => x._3.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, JsonUtil.toJson(tuple._3.get))).sortPartition(0, Order.ASCENDING)
-      val profiles = unic.filter(x => x._4.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, JsonUtil.toJson(tuple._4.get))).sortPartition(0, Order.ASCENDING)
+      val unic: DataSet[(String, Long, Option[Post], Option[Profile])] = data.sortPartition(0, Order.ASCENDING)
+      val posts = unic.filter(x => x._3.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, tuple._3.get))
+      val profiles = unic.filter(x => x._4.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, tuple._4.get))
 
-      posts.write(new TypeSerializerOutputFormat[(String, Long, String)], postPath, WriteMode.OVERWRITE)
-      profiles.write(new TypeSerializerOutputFormat[(String, Long, String)], profilePath, WriteMode.OVERWRITE)
+      posts.write(new TypeSerializerOutputFormat[(String, Long, Post)], postPath, WriteMode.OVERWRITE)
+      profiles.write(new TypeSerializerOutputFormat[(String, Long, Profile)], profilePath, WriteMode.OVERWRITE)
       //      posts.writeAsCsv(postPath, writeMode = WriteMode.OVERWRITE)
       //      profiles.writeAsCsv(profilePath, writeMode = WriteMode.OVERWRITE)
 

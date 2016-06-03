@@ -7,7 +7,6 @@ import org.apache.flink.core.fs.Path
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import ru.wobot.etl.Profile
 import org.apache.flink.api.scala._
-import org.apache.flink.core.memory.DataOutputView
 
 object StreamExSc {
 
