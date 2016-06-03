@@ -30,10 +30,10 @@ object KafkaJoiner {
     properties.setProperty("bootstrap.servers", "localhost:9092")
 
 
-    val profiles = stream.addSource(new FlinkKafkaConsumer09[(String, Long, Profile)]("profiles", profileSchema, properties))
-    profiles.print()
-    //val posts = stream.addSource(new FlinkKafkaConsumer09[(String, Long, Post)]("posts", postSchema, properties))
-    //posts.print()
+//    val profiles = stream.addSource(new FlinkKafkaConsumer09[(String, Long, Profile)]("profiles", profileSchema, properties))
+//    profiles.print()
+    val posts = stream.addSource(new FlinkKafkaConsumer09[(String, Long, Post)]("posts", postSchema, properties))
+    posts.print()
     stream.execute()
   }
 }

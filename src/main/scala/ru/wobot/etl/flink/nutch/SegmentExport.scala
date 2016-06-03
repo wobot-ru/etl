@@ -2,9 +2,13 @@ package ru.wobot.etl.flink.nutch
 
 import java.util.Properties
 
+import org.apache.flink.api.java.tuple
 import com.google.gson.Gson
 import org.apache.flink.api.common.operators.Order
+import org.apache.flink.api.common.typeinfo.BasicTypeInfo
 import org.apache.flink.api.java.io.{TypeSerializerInputFormat, TypeSerializerOutputFormat}
+import org.apache.flink.api.java.tuple.Tuple3
+import org.apache.flink.api.java.typeutils.{TupleTypeInfo, TypeExtractor}
 import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.api.scala.hadoop.mapreduce.HadoopInputFormat
 import org.apache.flink.api.scala.typeutils.CaseClassTypeInfo
@@ -53,8 +57,8 @@ object SegmentExport {
     properties = params.getProperties
     properties.setProperty("bootstrap.servers", "localhost:9092")
 
-//    batch.getConfig.enableForceKryo()
-//    stream.getConfig.enableForceKryo()
+    batch.getConfig.enableForceKryo()
+    stream.getConfig.enableForceKryo()
 
     if (params.has("seg"))
       addSegment(new Path(params.getRequired("seg")))
@@ -197,12 +201,23 @@ object SegmentExport {
       posts.write(postOutFormat, postPath, WriteMode.OVERWRITE)
       profiles.write(profileOutFormat, profilePath, WriteMode.OVERWRITE)
 
-      val out = new TypeSerializerOutputFormat[(String, Long, Profile)]
-      out.setOutputFilePath(new core.fs.Path(s"file:////c:\\tmp\\flink\\${segmentPath.getName}"))
-      out.setWriteMode(WriteMode.OVERWRITE)
-      val profStr = stream.readFile(profileInFormat, profilePath)
-      //profStr.writeUsingOutputFormat(out)
-      profStr.addSink(new FlinkKafkaProducer09[(String, Long, Profile)]("profiles", profileSchema, properties))
+      //      val out = new TypeSerializerOutputFormat[(String, Long, Profile)]
+      //      out.setOutputFilePath(new core.fs.Path(s"file:////c:\\tmp\\flink\\${segmentPath.getName}"))
+      //      out.setWriteMode(WriteMode.OVERWRITE)
+      val profileJTI = new TupleTypeInfo[tuple.Tuple3[String, Long, Profile]](
+        BasicTypeInfo.STRING_TYPE_INFO,
+        BasicTypeInfo.LONG_TYPE_INFO, TypeExtractor.createTypeInfo(classOf[Profile]))
+      val postJTI = new TupleTypeInfo[tuple.Tuple3[String, Long, Post]](
+        BasicTypeInfo.STRING_TYPE_INFO,
+        BasicTypeInfo.LONG_TYPE_INFO, TypeExtractor.createTypeInfo(classOf[Post]))
+
+      stream
+        .readFile(new TypeSerializerInputFormat[tuple.Tuple3[String, Long, Profile]](profileJTI), profilePath)
+        .addSink(new FlinkKafkaProducer09[tuple.Tuple3[String, Long, Profile]]("profiles", new TypeInformationSerializationSchema[Tuple3[String, Long, Profile]](profileJTI, stream.getConfig), properties))
+
+      stream
+        .readFile(new TypeSerializerInputFormat[tuple.Tuple3[String, Long, Post]](postJTI), postPath)
+        .addSink(new FlinkKafkaProducer09[tuple.Tuple3[String, Long, Post]]("posts", new TypeInformationSerializationSchema[Tuple3[String, Long, Post]](postJTI, stream.getConfig), properties))
       //      stream
       //        .readFile(postInFormat, postPath)
       //        .addSink(new FlinkKafkaProducer09[(String, Long, Post)]("posts", postSchema, properties))
