@@ -1,8 +1,9 @@
 package ru.wobot.etl.flink.nutch
 
+import java.util.Properties
+
 import com.google.gson.Gson
 import org.apache.flink.api.common.operators.Order
-import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.java.io.{TypeSerializerInputFormat, TypeSerializerOutputFormat}
 import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.api.scala.hadoop.mapreduce.HadoopInputFormat
@@ -11,6 +12,8 @@ import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment, _}
 import org.apache.flink.core
 import org.apache.flink.core.fs.FileSystem.WriteMode
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
+import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer09
+import org.apache.flink.streaming.util.serialization.TypeInformationSerializationSchema
 import org.apache.flink.util.Collector
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.io.{Text, Writable}
@@ -21,7 +24,7 @@ import org.apache.nutch.metadata.{Metadata, Nutch}
 import org.apache.nutch.parse.{ParseData, ParseText}
 import org.apache.nutch.segment.SegmentChecker
 import org.apache.nutch.util.{HadoopFSUtil, StringUtil}
-import ru.wobot.etl.{JsonUtil, Post, Profile}
+import ru.wobot.etl.{Post, Profile}
 import ru.wobot.sm.core.mapping.{PostProperties, ProfileProperties}
 import ru.wobot.sm.core.meta.ContentMetaConstants
 import ru.wobot.sm.core.parse.ParseResult
@@ -31,17 +34,27 @@ import ru.wobot.sm.core.parse.ParseResult
 object SegmentExport {
   val batch = ExecutionEnvironment.getExecutionEnvironment
   val stream = StreamExecutionEnvironment.getExecutionEnvironment
+  implicit val postTI = createTypeInformation[(String, Long, Post)].asInstanceOf[CaseClassTypeInfo[(String, Long, Post)]]
   implicit val profileTI = createTypeInformation[(String, Long, Profile)].asInstanceOf[CaseClassTypeInfo[(String, Long, Profile)]]
+
   val postOutFormat: TypeSerializerOutputFormat[(String, Long, Post)] = new TypeSerializerOutputFormat[(String, Long, Post)]
+  val postInFormat = new TypeSerializerInputFormat[(String, Long, Post)](postTI)
+  val postSchema = new TypeInformationSerializationSchema[(String, Long, Post)](postTI, stream.getConfig)
+
+  val profileOutFormat = new TypeSerializerOutputFormat[(String, Long, Profile)]
   val profileInFormat = new TypeSerializerInputFormat[(String, Long, Profile)](profileTI)
-  val profileOutFormat: TypeSerializerOutputFormat[(String, Long, Profile)] = new TypeSerializerOutputFormat[(String, Long, Profile)]
+  val profileSchema = new TypeInformationSerializationSchema[(String, Long, Profile)](profileTI, stream.getConfig)
+
+  var properties: Properties = null
 
   def main(args: Array[String]): Unit = {
-    batch.getConfig.enableForceKryo()
-    stream.getConfig.enableForceKryo()
-
     val startTime = System.currentTimeMillis()
-    val params: ParameterTool = ParameterTool.fromArgs(args)
+    val params = ParameterTool.fromArgs(args)
+    properties = params.getProperties
+    properties.setProperty("bootstrap.servers", "localhost:9092")
+
+//    batch.getConfig.enableForceKryo()
+//    stream.getConfig.enableForceKryo()
 
     if (params.has("seg"))
       addSegment(new Path(params.getRequired("seg")))
@@ -69,7 +82,6 @@ object SegmentExport {
       println("Export finish, elapsedTime=" + elapsedTime)
     }
   }
-
 
 
   def addSegment(segmentPath: Path): Unit = {
@@ -185,11 +197,20 @@ object SegmentExport {
       posts.write(postOutFormat, postPath, WriteMode.OVERWRITE)
       profiles.write(profileOutFormat, profilePath, WriteMode.OVERWRITE)
 
-      val profileStream = stream.readFile(profileInFormat, profilePath)
       val out = new TypeSerializerOutputFormat[(String, Long, Profile)]
       out.setOutputFilePath(new core.fs.Path(s"file:////c:\\tmp\\flink\\${segmentPath.getName}"))
       out.setWriteMode(WriteMode.OVERWRITE)
-      profileStream.writeUsingOutputFormat(out)
+      val profStr = stream.readFile(profileInFormat, profilePath)
+      //profStr.writeUsingOutputFormat(out)
+      profStr.addSink(new FlinkKafkaProducer09[(String, Long, Profile)]("profiles", profileSchema, properties))
+      //      stream
+      //        .readFile(postInFormat, postPath)
+      //        .addSink(new FlinkKafkaProducer09[(String, Long, Post)]("posts", postSchema, properties))
+      //
+      //      stream
+      //        .readFile(profileInFormat, profilePath)
+      //        .addSink(new FlinkKafkaProducer09[(String, Long, Profile)]("profiles", profileSchema, properties))
+
     }
   }
 }
