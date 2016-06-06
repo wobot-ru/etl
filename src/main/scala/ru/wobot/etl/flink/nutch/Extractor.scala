@@ -16,12 +16,12 @@ import org.apache.nutch.parse.{ParseData, ParseText}
 import org.apache.nutch.segment.SegmentChecker
 import org.apache.nutch.util.StringUtil
 import ru.wobot.etl._
-import ru.wobot.etl.dto.{Post, Profile}
+import ru.wobot.etl.dto.{PostDto, ProfileDto}
 import ru.wobot.sm.core.mapping.{PostProperties, ProfileProperties}
 import ru.wobot.sm.core.meta.ContentMetaConstants
 import ru.wobot.sm.core.parse.ParseResult
 
-class SegmentExtractor(val batch: ExecutionEnvironment) {
+class Extractor(val batch: ExecutionEnvironment) {
   batch.getConfig.enableForceKryo()
 
   def execute(): Unit = {
@@ -55,7 +55,7 @@ class SegmentExtractor(val batch: ExecutionEnvironment) {
         }
       })
 
-      val data = map.groupBy(0).reduceGroup((tuples: Iterator[(Text, NutchWritable)], out: Collector[PostOrRow]) => {
+      val data = map.groupBy(0).reduceGroup((tuples: Iterator[(Text, NutchWritable)], out: Collector[ProfileOrPost]) => {
         val gson = new Gson()
         def fromJson[T](json: String, clazz: Class[T]): T = {
           return gson.fromJson(json, clazz)
@@ -89,7 +89,7 @@ class SegmentExtractor(val batch: ExecutionEnvironment) {
               val parseMeta: Metadata = parseData.getParseMeta
               val subType = contentMeta.get(ContentMetaConstants.TYPE);
               if (subType != null && subType.equals(ru.wobot.sm.core.mapping.Types.PROFILE)) {
-                val profile = new Profile(key,
+                val profile = new ProfileDto(key,
                   segment,
                   crawlDate,
                   parseMeta.get(ProfileProperties.HREF),
@@ -102,7 +102,7 @@ class SegmentExtractor(val batch: ExecutionEnvironment) {
                   parseMeta.get(ProfileProperties.FOLLOWER_COUNT),
                   parseMeta.get(ProfileProperties.GENDER)
                 )
-                out.collect(PostOrRow(profile.id, fetchTime, None, Some(profile)))
+                out.collect(ProfileOrPost(profile.id, fetchTime, Some(profile), None))
               }
             }
             else if (parseText != null) {
@@ -114,7 +114,7 @@ class SegmentExtractor(val batch: ExecutionEnvironment) {
                   if (subType == null) subType = parseData.getContentMeta.get(ContentMetaConstants.TYPE)
                   if (subType == ru.wobot.sm.core.mapping.Types.POST) {
                     val parseMeta = parseResult.getParseMeta
-                    val post = new Post(id = parseResult.getUrl,
+                    val post = new PostDto(id = parseResult.getUrl,
                       segment = segment,
                       crawlDate = crawlDate,
                       href = parseResult.getUrl,
@@ -128,7 +128,7 @@ class SegmentExtractor(val batch: ExecutionEnvironment) {
                       isComment = parseMeta.get(PostProperties.IS_COMMENT).asInstanceOf[Boolean]
                     )
 
-                    out.collect(PostOrRow(post.id, fetchTime, Some(post), None))
+                    out.collect(ProfileOrPost(post.id, fetchTime, None, Some(post)))
                   }
                 }
               }
@@ -139,13 +139,13 @@ class SegmentExtractor(val batch: ExecutionEnvironment) {
 
 
       val unic = data.sortPartition(0, Order.ASCENDING)
-      val posts = unic.filter(x => x.post.isDefined).map(r => PostRow(r.url, r.crawlDate, r.post.get))
-      val profiles = unic.filter(x => x.profile.isDefined).map(r => ProfileRow(r.url, r.crawlDate, r.profile.get))
+      val posts = unic.filter(x => x.post.isDefined).map(r => Post(r.url, r.crawlDate, r.post.get))
+      val profiles = unic.filter(x => x.profile.isDefined).map(r => Profile(r.url, r.crawlDate, r.profile.get))
 
       val postPath = new Path(segmentPath, "parse-posts").toString
-      posts.write(new TypeSerializerOutputFormat[PostRow], postPath, WriteMode.OVERWRITE)
+      posts.write(new TypeSerializerOutputFormat[Post], postPath, WriteMode.OVERWRITE)
       val profilePath = new Path(segmentPath, "parse-profiles").toString
-      profiles.write(new TypeSerializerOutputFormat[ProfileRow], profilePath, WriteMode.OVERWRITE)
+      profiles.write(new TypeSerializerOutputFormat[Profile], profilePath, WriteMode.OVERWRITE)
       ExtractedPaths(Some(profilePath), Some(postPath))
     }
     else

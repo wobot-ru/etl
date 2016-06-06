@@ -8,7 +8,6 @@ import org.apache.hadoop.mapred.JobConf
 import org.apache.nutch.util.HadoopFSUtil
 
 object Nutch {
-
   def main(args: Array[String]): Unit = {
     val startTime = System.currentTimeMillis()
     val params = ParameterTool.fromArgs(args)
@@ -18,8 +17,9 @@ object Nutch {
     //    stream.getConfig.setRestartStrategy(RestartStrategies.fixedDelayRestart(4, 10000))
     //    stream.enableCheckpointing(5000)
 
-    val extractor = new SegmentExtractor(ExecutionEnvironment.getExecutionEnvironment)
-    val publisher = new SegmentPublisher(StreamExecutionEnvironment.getExecutionEnvironment, properties)
+    val extractor = new Extractor(ExecutionEnvironment.getExecutionEnvironment)
+    val publisher = new Publisher(StreamExecutionEnvironment.getExecutionEnvironment, properties)
+
     def addSegment(segmentPath: Path): Unit = {
       val paths = extractor.addSegment(segmentPath)
       paths.posts match {

@@ -11,9 +11,9 @@ import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer09
 import org.apache.flink.streaming.util.serialization.TypeInformationSerializationSchema
 import ru.wobot.etl._
-import ru.wobot.etl.dto.{Post, Profile}
+import ru.wobot.etl.dto.{PostDto, ProfileDto}
 
-object KafkaJoiner {
+object Kafka {
   val stream = StreamExecutionEnvironment.getExecutionEnvironment
 
 
@@ -25,15 +25,15 @@ object KafkaJoiner {
     //properties.setProperty("auto.offset.reset", "earliest")
 
 
-    val profiles = stream.addSource(new FlinkKafkaConsumer09[ProfileRow]("profiles", new TypeInformationSerializationSchema[ProfileRow](profileTI, stream.getConfig), properties))
-    val posts = stream.addSource(new FlinkKafkaConsumer09[PostRow]("posts", new TypeInformationSerializationSchema[PostRow](postTI, stream.getConfig), properties))
+    val profiles = stream.addSource(new FlinkKafkaConsumer09[Profile]("profiles", new TypeInformationSerializationSchema[Profile](profileTI, stream.getConfig), properties))
+    val posts = stream.addSource(new FlinkKafkaConsumer09[Post]("posts", new TypeInformationSerializationSchema[Post](postTI, stream.getConfig), properties))
     posts
       .join(profiles)
-      .where(new KeySelectorWithType[PostRow, String](r => r.post.profileId, TypeInformation.of(classOf[String])))
-      .equalTo(new KeySelectorWithType[ProfileRow, String](r => r.url, TypeInformation.of(classOf[String])))
+      .where(new KeySelectorWithType[Post, String](r => r.post.profileId, TypeInformation.of(classOf[String])))
+      .equalTo(new KeySelectorWithType[Profile, String](r => r.url, TypeInformation.of(classOf[String])))
       .window(TumblingEventTimeWindows.of(Time.seconds(60)))
-      .apply(new JoinFunction[PostRow, ProfileRow, (Post, Profile)] {
-        override def join(first: PostRow, second: ProfileRow): (Post, Profile) = (first.post, second.profile)
+      .apply(new JoinFunction[Post, Profile, (PostDto, ProfileDto)] {
+        override def join(first: Post, second: Profile): (PostDto, ProfileDto) = (first.post, second.profile)
       }).print()
 
     //profiles.print()

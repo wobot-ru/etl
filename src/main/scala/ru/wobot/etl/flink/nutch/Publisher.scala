@@ -9,22 +9,23 @@ import org.apache.flink.streaming.util.serialization.TypeInformationSerializatio
 import ru.wobot.etl._
 
 
-class SegmentPublisher(stream: StreamExecutionEnvironment, properties: Properties) {
+class Publisher(stream: StreamExecutionEnvironment, properties: Properties) {
 
   stream.getConfig.enableForceKryo()
   stream.getConfig.disableSysoutLogging
 
   def publishProfiles(profiles: String) = {
     stream
-      .readFile(new TypeSerializerInputFormat[ProfileRow](profileTI), profiles)
-      .addSink(new FlinkKafkaProducer09[ProfileRow]("profiles", new TypeInformationSerializationSchema[ProfileRow](profileTI, stream.getConfig), properties))
+      .readFile(new TypeSerializerInputFormat[Profile](profileTI), profiles)
+      .addSink(new FlinkKafkaProducer09[Profile]("profiles", new TypeInformationSerializationSchema[Profile](profileTI, stream.getConfig), properties))
   }
 
   def publishPosts(posts: String) = {
     stream
-      .readFile(new TypeSerializerInputFormat[PostRow](postTI), posts)
-      .addSink(new FlinkKafkaProducer09[PostRow]("posts", new TypeInformationSerializationSchema[PostRow](postTI, stream.getConfig), properties))
+      .readFile(new TypeSerializerInputFormat[Post](postTI), posts)
+      .addSink(new FlinkKafkaProducer09[Post]("posts", new TypeInformationSerializationSchema[Post](postTI, stream.getConfig), properties))
   }
+
   def execute(): Unit = {
     stream.execute("Publish to kafka...")
   }
