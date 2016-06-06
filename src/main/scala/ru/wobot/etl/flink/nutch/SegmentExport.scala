@@ -2,21 +2,20 @@ package ru.wobot.etl.flink.nutch
 
 import java.util.Properties
 
-import org.apache.flink.api.java.tuple
 import com.google.gson.Gson
 import org.apache.flink.api.common.operators.Order
 import org.apache.flink.api.common.restartstrategy.RestartStrategies
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo
 import org.apache.flink.api.java.io.{TypeSerializerInputFormat, TypeSerializerOutputFormat}
+import org.apache.flink.api.java.tuple
 import org.apache.flink.api.java.tuple.Tuple3
 import org.apache.flink.api.java.typeutils.{TupleTypeInfo, TypeExtractor}
 import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.api.scala.hadoop.mapreduce.HadoopInputFormat
 import org.apache.flink.api.scala.typeutils.CaseClassTypeInfo
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment, _}
-import org.apache.flink.core
 import org.apache.flink.core.fs.FileSystem.WriteMode
-import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
+import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer09
 import org.apache.flink.streaming.util.serialization.TypeInformationSerializationSchema
 import org.apache.flink.util.Collector
