@@ -1,4 +1,6 @@
-package ru.wobot.etl
+package ru.wobot.etl.dto
+
+import ru.wobot.etl.JsonUtil
 
 /**
   * Created by kviz on 5/25/2016.

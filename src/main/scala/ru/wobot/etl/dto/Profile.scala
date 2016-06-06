@@ -1,5 +1,6 @@
-package ru.wobot.etl
+package ru.wobot.etl.dto
 
+import ru.wobot.etl.JsonUtil
 
 class Profile(val id: String,
               val segment: String,

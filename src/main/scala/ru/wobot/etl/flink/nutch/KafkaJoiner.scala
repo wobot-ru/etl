@@ -13,7 +13,7 @@ import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindo
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer09
 import org.apache.flink.streaming.util.serialization.TypeInformationSerializationSchema
-import ru.wobot.etl.{Post, Profile}
+import ru.wobot.etl.dto.{Post, Profile}
 
 object KafkaJoiner {
   val stream = StreamExecutionEnvironment.getExecutionEnvironment
@@ -34,7 +34,7 @@ object KafkaJoiner {
     val params: ParameterTool = ParameterTool.fromArgs(args)
     val properties = params.getProperties
     properties.setProperty("bootstrap.servers", "localhost:9092")
-    properties.setProperty("auto.offset.reset", "earliest")
+    //properties.setProperty("auto.offset.reset", "earliest")
 
 
     val profiles: DataStreamSource[(String, Long, Profile)] = stream.addSource(new FlinkKafkaConsumer09[(String, Long, Profile)]("profiles", profileSchema, properties))
@@ -45,19 +45,18 @@ object KafkaJoiner {
     val filtredProfile = profiles.filter(new FilterFunction[(String, Long, Profile)] {
       override def filter(value: (String, Long, Profile)): Boolean = value._1 != null && value._3 != null
     })
-    //filtredProfile.print()
 
-    filtredPost
-      .join(filtredProfile)
-      .where(new KeySelectorWithType[(String, Long, Post), String]((tuple: (String, Long, Post)) => tuple._3.profileId, TypeInformation.of(classOf[String])))
-      .equalTo(new KeySelectorWithType[(String, Long, Profile), String]((tuple: (String, Long, Profile)) => tuple._1, TypeInformation.of(classOf[String])))
-      .window(TumblingEventTimeWindows.of(Time.seconds(60)))
-      .apply(new JoinFunction[(String, Long, Post), (String, Long, Profile), (Post, Profile)] {
-        override def join(first: (String, Long, Post), second: (String, Long, Profile)): (Post, Profile) = (first._3, second._3)
-      }).print()
+//    filtredPost
+//      .join(filtredProfile)
+//      .where(new KeySelectorWithType[(String, Long, Post), String]((tuple: (String, Long, Post)) => tuple._3.profileId, TypeInformation.of(classOf[String])))
+//      .equalTo(new KeySelectorWithType[(String, Long, Profile), String]((tuple: (String, Long, Profile)) => tuple._1, TypeInformation.of(classOf[String])))
+//      .window(TumblingEventTimeWindows.of(Time.seconds(60)))
+//      .apply(new JoinFunction[(String, Long, Post), (String, Long, Profile), (Post, Profile)] {
+//        override def join(first: (String, Long, Post), second: (String, Long, Profile)): (Post, Profile) = (first._3, second._3)
+//      }).print()
 
-    //    profiles.print()
-    //    posts.print()
+    profiles.print()
+    //posts.print()
     stream.execute()
   }
 }

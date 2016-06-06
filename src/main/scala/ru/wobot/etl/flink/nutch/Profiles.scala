@@ -1,6 +1,6 @@
 package ru.wobot.etl.flink.nutch
 
-import ru.wobot.etl.Profile
+import ru.wobot.etl.dto.Profile
 
 /**
  * Created by kviz on 6/2/2016.

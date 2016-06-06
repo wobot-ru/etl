@@ -1,5 +1,7 @@
 package ru.wobot.etl
 
+import ru.wobot.etl.dto.{Post, Profile}
+
 
 object JsonUtil {
 
