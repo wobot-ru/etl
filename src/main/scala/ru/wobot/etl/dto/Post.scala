@@ -19,3 +19,4 @@ class Post(val id: String,
 {
   override def toString: String = JsonUtil.toJson(this)
 }
+

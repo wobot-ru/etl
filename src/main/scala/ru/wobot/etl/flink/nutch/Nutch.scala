@@ -4,16 +4,10 @@ import java.util.Properties
 
 import com.google.gson.Gson
 import org.apache.flink.api.common.operators.Order
-import org.apache.flink.api.common.restartstrategy.RestartStrategies
-import org.apache.flink.api.common.typeinfo.BasicTypeInfo
 import org.apache.flink.api.java.io.{TypeSerializerInputFormat, TypeSerializerOutputFormat}
-import org.apache.flink.api.java.tuple
-import org.apache.flink.api.java.tuple.Tuple3
-import org.apache.flink.api.java.typeutils.{TupleTypeInfo, TypeExtractor}
 import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.api.scala.hadoop.mapreduce.HadoopInputFormat
-import org.apache.flink.api.scala.typeutils.CaseClassTypeInfo
-import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment, _}
+import org.apache.flink.api.scala.{ExecutionEnvironment, _}
 import org.apache.flink.core.fs.FileSystem.WriteMode
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer09
@@ -24,37 +18,20 @@ import org.apache.hadoop.io.{Text, Writable}
 import org.apache.hadoop.mapred.JobConf
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat
 import org.apache.nutch.crawl.{CrawlDatum, NutchWritable}
-import org.apache.nutch.metadata.{Metadata, Nutch}
+import org.apache.nutch.metadata.Metadata
 import org.apache.nutch.parse.{ParseData, ParseText}
 import org.apache.nutch.segment.SegmentChecker
 import org.apache.nutch.util.{HadoopFSUtil, StringUtil}
+import ru.wobot.etl._
 import ru.wobot.etl.dto.{Post, Profile}
 import ru.wobot.sm.core.mapping.{PostProperties, ProfileProperties}
 import ru.wobot.sm.core.meta.ContentMetaConstants
 import ru.wobot.sm.core.parse.ParseResult
 
-//import org.apache.flink.api.scala.typeutils._
-
 object SegmentExport {
   val batch = ExecutionEnvironment.getExecutionEnvironment
   val stream = StreamExecutionEnvironment.getExecutionEnvironment
-  implicit val postTI = createTypeInformation[(String, Long, Post)].asInstanceOf[CaseClassTypeInfo[(String, Long, Post)]]
-  implicit val profileTI = createTypeInformation[(String, Long, Profile)].asInstanceOf[CaseClassTypeInfo[(String, Long, Profile)]]
-  //
-  val profileJTI = new TupleTypeInfo[tuple.Tuple3[String, Long, Profile]](
-    BasicTypeInfo.STRING_TYPE_INFO,
-    BasicTypeInfo.LONG_TYPE_INFO, TypeExtractor.createTypeInfo(classOf[Profile]))
-  val postJTI = new TupleTypeInfo[tuple.Tuple3[String, Long, Post]](
-    BasicTypeInfo.STRING_TYPE_INFO,
-    BasicTypeInfo.LONG_TYPE_INFO, TypeExtractor.createTypeInfo(classOf[Post]))
-  //
-  //  val postOutFormat: TypeSerializerOutputFormat[(String, Long, Post)] = new TypeSerializerOutputFormat[(String, Long, Post)]
-  //  val postInFormat = new TypeSerializerInputFormat[(String, Long, Post)](postTI)
-  //  val postSchema = new TypeInformationSerializationSchema[(String, Long, Post)](postTI, stream.getConfig)
-  //
-  //  val profileOutFormat = new TypeSerializerOutputFormat[(String, Long, Profile)]
-  //  val profileInFormat = new TypeSerializerInputFormat[(String, Long, Profile)](profileTI)
-  //  val profileSchema = new TypeInformationSerializationSchema[(String, Long, Profile)](profileTI, stream.getConfig)
+
 
   var properties: Properties = null
 
@@ -80,6 +57,16 @@ object SegmentExport {
       val segments = HadoopFSUtil.getPaths(fs.listStatus(segmentIn, HadoopFSUtil.getPassDirectoriesFilter(fs)))
       for (dir <- segments) {
         addSegment(dir)
+
+        val profilePath = new Path(dir, "parse-profiles").toString
+        stream
+          .readFile(new TypeSerializerInputFormat[ProfileRow](profileTI), profilePath)
+          .addSink(new FlinkKafkaProducer09[ProfileRow]("profiles", new TypeInformationSerializationSchema[ProfileRow](profileTI, stream.getConfig), properties))
+
+        val postPath = new Path(dir, "parse-posts").toString
+        stream
+          .readFile(new TypeSerializerInputFormat[PostRow](postTI), postPath)
+          .addSink(new FlinkKafkaProducer09[PostRow]("posts", new TypeInformationSerializationSchema[PostRow](postTI, stream.getConfig), properties))
       }
     }
     try {
@@ -118,7 +105,7 @@ object SegmentExport {
         }
       })
 
-      val data = map.groupBy(0).reduceGroup((tuples: Iterator[(Text, NutchWritable)], out: Collector[(String, Long, Option[Post], Option[Profile])]) => {
+      val data = map.groupBy(0).reduceGroup((tuples: Iterator[(Text, NutchWritable)], out: Collector[PostOrRow]) => {
         val gson = new Gson()
         def fromJson[T](json: String, clazz: Class[T]): T = {
           return gson.fromJson(json, clazz)
@@ -129,8 +116,7 @@ object SegmentExport {
         var parseData: ParseData = null
         var parseText: ParseText = null
 
-        val toArray: Array[(Text, NutchWritable)] = tuples.toArray
-        for ((url, data) <- toArray) {
+        for ((url, data) <- tuples) {
           data.get() match {
             case c: CrawlDatum => {
               key = url.toString
@@ -147,7 +133,7 @@ object SegmentExport {
           if (skipFromElastic == null || !skipFromElastic.equals("1")) {
             val fetchTime: Long = fetchDatum.getFetchTime
             val crawlDate: String = fetchTime.toString
-            val segment = contentMeta.get(Nutch.SEGMENT_NAME_KEY);
+            val segment = contentMeta.get(org.apache.nutch.metadata.Nutch.SEGMENT_NAME_KEY);
             val isSingleDoc: Boolean = !"true".equals(contentMeta.get(ContentMetaConstants.MULTIPLE_PARSE_RESULT))
             if (isSingleDoc) {
               val parseMeta: Metadata = parseData.getParseMeta
@@ -166,7 +152,7 @@ object SegmentExport {
                   parseMeta.get(ProfileProperties.FOLLOWER_COUNT),
                   parseMeta.get(ProfileProperties.GENDER)
                 )
-                out.collect(profile.id, fetchTime, None, Some(profile))
+                out.collect(PostOrRow(profile.id, fetchTime, None, Some(profile)))
               }
             }
             else if (parseText != null) {
@@ -192,8 +178,7 @@ object SegmentExport {
                       isComment = parseMeta.get(PostProperties.IS_COMMENT).asInstanceOf[Boolean]
                     )
 
-                    //if (crawlDate != null)
-                    out.collect(post.id, fetchTime, Some(post), None)
+                    out.collect(PostOrRow(post.id, fetchTime, Some(post), None))
                   }
                 }
               }
@@ -205,20 +190,12 @@ object SegmentExport {
       val postPath = new Path(segmentPath, "parse-posts").toString
       val profilePath = new Path(segmentPath, "parse-profiles").toString
 
-      val unic: DataSet[(String, Long, Option[Post], Option[Profile])] = data.sortPartition(0, Order.ASCENDING)
-      val posts = unic.filter(x => x._3.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, tuple._3.get))
-      val profiles: DataSet[(String, Long, Profile)] = unic.filter(x => x._4.isDefined).map((tuple: (String, Long, Option[Post], Option[Profile])) => (tuple._1, tuple._2, tuple._4.get))
+      val unic = data.sortPartition(0, Order.ASCENDING)
+      val posts = unic.filter(x => x.post.isDefined).map(r => PostRow(r.url, r.crawlDate, r.post.get))
+      val profiles = unic.filter(x => x.profile.isDefined).map(r => ProfileRow(r.url, r.crawlDate, r.profile.get))
 
-      posts.write(new TypeSerializerOutputFormat[(String, Long, Post)], postPath, WriteMode.OVERWRITE)
-      profiles.write(new TypeSerializerOutputFormat[(String, Long, Profile)], profilePath, WriteMode.OVERWRITE)
-
-      stream
-        .readFile(new TypeSerializerInputFormat[(String, Long, Profile)](profileTI), profilePath)
-        .addSink(new FlinkKafkaProducer09[(String, Long, Profile)]("profiles", new TypeInformationSerializationSchema[(String, Long, Profile)](profileTI, stream.getConfig), properties))
-
-      stream
-        .readFile(new TypeSerializerInputFormat[(String, Long, Post)](postTI), postPath)
-        .addSink(new FlinkKafkaProducer09[(String, Long, Post)]("posts", new TypeInformationSerializationSchema[(String, Long, Post)](postTI, stream.getConfig), properties))
+      posts.write(new TypeSerializerOutputFormat[PostRow], postPath, WriteMode.OVERWRITE)
+      profiles.write(new TypeSerializerOutputFormat[ProfileRow], profilePath, WriteMode.OVERWRITE)
     }
   }
 }
