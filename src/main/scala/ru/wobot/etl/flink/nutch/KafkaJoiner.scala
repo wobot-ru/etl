@@ -39,23 +39,16 @@ object KafkaJoiner {
 
     val profiles: DataStreamSource[(String, Long, Profile)] = stream.addSource(new FlinkKafkaConsumer09[(String, Long, Profile)]("profiles", profileSchema, properties))
     val posts = stream.addSource(new FlinkKafkaConsumer09[(String, Long, Post)]("posts", postSchema, properties))
-    val filtredPost = posts.filter(new FilterFunction[(String, Long, Post)] {
-      override def filter(value: (String, Long, Post)): Boolean = value._1 != null && value._3 != null && value._3.profileId != null
-    })
-    val filtredProfile = profiles.filter(new FilterFunction[(String, Long, Profile)] {
-      override def filter(value: (String, Long, Profile)): Boolean = value._1 != null && value._3 != null
-    })
+    posts
+      .join(profiles)
+      .where(new KeySelectorWithType[(String, Long, Post), String]((tuple: (String, Long, Post)) => tuple._3.profileId, TypeInformation.of(classOf[String])))
+      .equalTo(new KeySelectorWithType[(String, Long, Profile), String]((tuple: (String, Long, Profile)) => tuple._1, TypeInformation.of(classOf[String])))
+      .window(TumblingEventTimeWindows.of(Time.seconds(60)))
+      .apply(new JoinFunction[(String, Long, Post), (String, Long, Profile), (Post, Profile)] {
+        override def join(first: (String, Long, Post), second: (String, Long, Profile)): (Post, Profile) = (first._3, second._3)
+      }).print()
 
-//    filtredPost
-//      .join(filtredProfile)
-//      .where(new KeySelectorWithType[(String, Long, Post), String]((tuple: (String, Long, Post)) => tuple._3.profileId, TypeInformation.of(classOf[String])))
-//      .equalTo(new KeySelectorWithType[(String, Long, Profile), String]((tuple: (String, Long, Profile)) => tuple._1, TypeInformation.of(classOf[String])))
-//      .window(TumblingEventTimeWindows.of(Time.seconds(60)))
-//      .apply(new JoinFunction[(String, Long, Post), (String, Long, Profile), (Post, Profile)] {
-//        override def join(first: (String, Long, Post), second: (String, Long, Profile)): (Post, Profile) = (first._3, second._3)
-//      }).print()
-
-    profiles.print()
+    //profiles.print()
     //posts.print()
     stream.execute()
   }
