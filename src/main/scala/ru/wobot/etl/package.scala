@@ -14,4 +14,6 @@ package object etl {
   case class ProfileRow(url: String, crawlDate: Long, profile: Profile)
 
   case class PostOrRow(url: String, crawlDate: Long, post:Option[Post], profile:Option[Profile])
+
+  case class ExtractedPaths(profiles:Option[String], posts:Option[String])
 }
