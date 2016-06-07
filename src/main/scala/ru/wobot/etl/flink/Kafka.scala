@@ -27,8 +27,8 @@ object Kafka {
     //properties.setProperty("auto.offset.reset", "earliest")
 
 
-    val profiles = stream.addSource(new FlinkKafkaConsumer09[Profile]("profiles", new TypeInformationSerializationSchema[Profile](profileTI, stream.getConfig), properties))
-    val posts = stream.addSource(new FlinkKafkaConsumer09[Post]("posts", new TypeInformationSerializationSchema[Post](postTI, stream.getConfig), properties))
+    val profiles = stream.addSource(new FlinkKafkaConsumer09[Profile]("profile", new TypeInformationSerializationSchema[Profile](profileTI, stream.getConfig), properties))
+    val posts = stream.addSource(new FlinkKafkaConsumer09[Post]("post", new TypeInformationSerializationSchema[Post](postTI, stream.getConfig), properties))
     profiles.writeUsingOutputFormat(new HBaseOutputFormat())
 //    posts
 //      .join(profiles)
@@ -55,15 +55,15 @@ object Kafka {
 
     @throws[IOException]
     override def open(taskNumber: Int, numTasks: Int) {
-      table = new HTable(conf, "profile")
+      table = new HTable(conf, HbaseConstants.T_PROFILE_TO_ADD)
     }
 
     @throws[IOException]
     override def writeRecord(p: Profile) {
       val put: Put = new Put(Bytes.toBytes(s"${p.url}|${p.crawlDate}"))
-      put.add(Bytes.toBytes("id"), Bytes.toBytes("id"), Bytes.toBytes(p.url))
-      put.add(Bytes.toBytes("id"), Bytes.toBytes("crawlDate"), Bytes.toBytes(p.crawlDate))
-      put.add(Bytes.toBytes("data"), Bytes.toBytes("json"), Bytes.toBytes(p.profile.toJson()))
+      put.add(HbaseConstants.CF_ID, HbaseConstants.C_ID, Bytes.toBytes(p.url))
+      put.add(HbaseConstants.CF_ID, HbaseConstants.C_CRAWL_DATE, Bytes.toBytes(p.crawlDate))
+      put.add(HbaseConstants.CF_DATA, HbaseConstants.C_JSON, Bytes.toBytes(p.profile.toJson()))
       table.put(put)
     }
 

@@ -17,13 +17,13 @@ class Publisher(stream: StreamExecutionEnvironment, properties: Properties) {
   def publishProfiles(profiles: String) = {
     stream
       .readFile(new TypeSerializerInputFormat[Profile](profileTI), profiles)
-      .addSink(new FlinkKafkaProducer09[Profile]("profiles", new TypeInformationSerializationSchema[Profile](profileTI, stream.getConfig), properties))
+      .addSink(new FlinkKafkaProducer09[Profile]("profile", new TypeInformationSerializationSchema[Profile](profileTI, stream.getConfig), properties))
   }
 
   def publishPosts(posts: String) = {
     stream
       .readFile(new TypeSerializerInputFormat[Post](postTI), posts)
-      .addSink(new FlinkKafkaProducer09[Post]("posts", new TypeInformationSerializationSchema[Post](postTI, stream.getConfig), properties))
+      .addSink(new FlinkKafkaProducer09[Post]("post", new TypeInformationSerializationSchema[Post](postTI, stream.getConfig), properties))
   }
 
   def execute() = {
