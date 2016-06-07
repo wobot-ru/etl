@@ -17,4 +17,6 @@ class ProfileDto(id: String,
   extends Index(id: String, segment: String, crawlDate: String, href: String, source: String) {
 
   override def toString: String = JsonUtil.toJson(this)
+
+  def toJson() = JsonUtil.toJson(this)
 }

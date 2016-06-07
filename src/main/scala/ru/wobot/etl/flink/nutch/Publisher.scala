@@ -26,7 +26,7 @@ class Publisher(stream: StreamExecutionEnvironment, properties: Properties) {
       .addSink(new FlinkKafkaProducer09[Post]("posts", new TypeInformationSerializationSchema[Post](postTI, stream.getConfig), properties))
   }
 
-  def execute(): Unit = {
+  def execute() = {
     stream.execute("Publish to kafka...")
   }
 }
