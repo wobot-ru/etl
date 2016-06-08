@@ -2,7 +2,7 @@ package ru.wobot.etl.flink
 
 import org.apache.hadoop.hbase.util.Bytes
 
-object HbaseConstants {
+object HBaseConstants {
   val CF_ID = Bytes.toBytes("id")
   val CF_DATA = Bytes.toBytes("data")
   val C_ID = Bytes.toBytes("id")
