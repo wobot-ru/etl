@@ -16,6 +16,8 @@ class PostDto(id: String,
               val isComment: Boolean)
   extends Index(id: String, segment: String, crawlDate: String, href: String, source: String) {
 
-  override def toString: String = JsonUtil.toJson(this)
+  override def toString: String = toJson()
+
+  def toJson() = JsonUtil.toJson(this)
 }
 

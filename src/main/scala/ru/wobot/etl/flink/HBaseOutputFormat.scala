@@ -9,8 +9,9 @@ import org.apache.hadoop.hbase.client.{HTable, Put}
 import org.apache.hadoop.hbase.util.Bytes
 import ru.wobot.etl.Profile
 import org.apache.flink.configuration.Configuration
+import ru.wobot.etl._
 
-class HBaseOutputFormat(tableName: String, formatId: Profile => String) extends OutputFormat[Profile] {
+class HBaseOutputFormat[T<:Document](tableName: String, formatId:T => String) extends OutputFormat[T] {
   private var conf: HbaseConf = null
   private var table: HTable = null
 
@@ -24,11 +25,15 @@ class HBaseOutputFormat(tableName: String, formatId: Profile => String) extends 
   }
 
   @throws[IOException]
-  override def writeRecord(p: Profile) {
-    val put: Put = new Put(Bytes.toBytes(formatId(p)))
-    put.add(HBaseConstants.CF_ID, HBaseConstants.C_ID, Bytes.toBytes(p.url))
-    put.add(HBaseConstants.CF_ID, HBaseConstants.C_CRAWL_DATE, Bytes.toBytes(p.crawlDate))
-    put.add(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.profile.toJson()))
+  override def writeRecord(d: T) {
+    val put: Put = new Put(Bytes.toBytes(formatId(d)))
+    put.add(HBaseConstants.CF_ID, HBaseConstants.C_ID, Bytes.toBytes(d.url))
+    put.add(HBaseConstants.CF_ID, HBaseConstants.C_CRAWL_DATE, Bytes.toBytes(d.crawlDate))
+    val json = d match {
+      case p: Profile => p.profile.toJson()
+      case p: Post => p.post.toJson()
+    }
+    put.add(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(json))
     table.put(put)
   }
 

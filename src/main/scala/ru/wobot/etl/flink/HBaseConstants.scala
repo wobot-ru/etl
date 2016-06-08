@@ -1,5 +1,6 @@
 package ru.wobot.etl.flink
 
+import org.apache.hadoop.hbase.TableName
 import org.apache.hadoop.hbase.util.Bytes
 
 object HBaseConstants {
@@ -11,4 +12,9 @@ object HBaseConstants {
 
   val T_PROFILE = "profile"
   val T_PROFILE_TO_ADD = "profile-to-add"
+  val T_POST = "post"
+
+  object Tables{
+    val PROFILE_TO_ADD = TableName.valueOf(HBaseConstants.T_PROFILE_TO_ADD)
+  }
 }

@@ -22,6 +22,7 @@ object Kafka {
     val profiles = stream.addSource(new FlinkKafkaConsumer09[Profile]("profile", new TypeInformationSerializationSchema[Profile](profileTI, stream.getConfig), properties))
     val posts = stream.addSource(new FlinkKafkaConsumer09[Post]("post", new TypeInformationSerializationSchema[Post](postTI, stream.getConfig), properties))
     profiles.writeUsingOutputFormat(new HBaseOutputFormat(HBaseConstants.T_PROFILE_TO_ADD, p => s"${p.url}|${p.crawlDate}"))
+    posts.writeUsingOutputFormat(new HBaseOutputFormat(HBaseConstants.T_POST, p => s"${p.url}|${p.crawlDate}"))
     //    posts
     //      .join(profiles)
     //      .where(new KeySelectorWithType[Post, String](r => r.post.profileId, TypeInformation.of(classOf[String])))
