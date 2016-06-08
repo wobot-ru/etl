@@ -9,11 +9,17 @@ package object etl {
   implicit val postTI = createTypeInformation[Post].asInstanceOf[CaseClassTypeInfo[Post]]
   implicit val profileTI = createTypeInformation[Profile].asInstanceOf[CaseClassTypeInfo[Profile]]
 
-  case class Post(url: String, crawlDate: Long, post: PostDto)
+  trait Document {
+    def url: String
 
-  case class Profile(url: String, crawlDate: Long, profile: ProfileDto)
+    def crawlDate: Long
+  }
 
-  case class ProfileOrPost(url: String, crawlDate: Long, profile: Option[ProfileDto], post: Option[PostDto])
+  case class Post(url: String, crawlDate: Long, post: PostDto) extends Document
 
-  case class ExtractedPaths(profiles:Option[String], posts:Option[String])
+  case class Profile(url: String, crawlDate: Long, profile: ProfileDto) extends Document
+
+  case class ExtractedPaths(profiles: Option[String], posts: Option[String])
+
+  case class ProfileOrPost(url: String, crawlDate: Long, profile: Option[ProfileDto], post: Option[PostDto]) extends Document
 }
