@@ -9,6 +9,7 @@ import ru.wobot.etl.{JsonUtil, Post, Profile}
 object InputFormat {
   def profileToProcess() = new ProfileInputFormat(HBaseConstants.T_PROFILE_TO_PROCESS)
   def postToProcess() = new PostInputFormat(HBaseConstants.T_POST_TO_PROCESS)
+  def postWithoutProfile() = new PostInputFormat(HBaseConstants.T_POST_WITHOUT_PROFILE)
 
   def profilesStore() = new ProfileInputFormat(HBaseConstants.T_PROFILE_VIEW)
 
