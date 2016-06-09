@@ -32,7 +32,7 @@
   <!--</property>-->
   <property>
     <name>hbase.zookeeper.quorum</name>
-    <value>localhost</value>
+    <value>hdp-01,hdp-02,hdp-03</value>
   </property>
     <!-- 
   <property>

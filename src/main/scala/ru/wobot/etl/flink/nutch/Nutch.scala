@@ -30,9 +30,6 @@ object Nutch {
       }
     }
 
-    if (params.has("seg"))
-      addSegment(new Path(params.getRequired("seg")))
-
     if (params.has("dir")) {
       val segmentIn = new Path(params.getRequired("dir"))
       val fs = segmentIn.getFileSystem(new JobConf())
@@ -41,6 +38,9 @@ object Nutch {
         addSegment(dir)
       }
     }
+    else
+      addSegment(new Path(params.getRequired("seg")))
+
     try {
       extractor.execute()
       publisher.execute()

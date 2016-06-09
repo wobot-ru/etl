@@ -17,7 +17,9 @@ object HBase extends App {
   val postsToProcess = env.createInput(InputFormat.postToProcess)
   val profiles = env.createInput(InputFormat.profilesStore)
 
+
   val admin = new HBaseAdmin(HBaseConfiguration.create)
+
   def disableTable(name: TableName) = {
     if (admin.isTableEnabled(name))
       admin.disableTable(name)
