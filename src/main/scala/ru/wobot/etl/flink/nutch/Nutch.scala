@@ -12,7 +12,7 @@ object Nutch {
     val startTime = System.currentTimeMillis()
     val params = ParameterTool.fromArgs(args)
     val properties = params.getProperties
-    properties.setProperty("bootstrap.servers", "localhost:9092")
+    //properties.setProperty("bootstrap.servers", "localhost:9092")
 
     //    stream.getConfig.setRestartStrategy(RestartStrategies.fixedDelayRestart(4, 10000))
     //    stream.enableCheckpointing(5000)

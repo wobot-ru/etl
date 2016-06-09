@@ -3,7 +3,7 @@ package ru.wobot.etl.flink
 import org.apache.flink.api.common.operators.Order
 import org.apache.flink.api.scala.{ExecutionEnvironment, _}
 import org.apache.flink.util.Collector
-import org.apache.hadoop.hbase.client.{Connection, ConnectionFactory}
+import org.apache.hadoop.hbase.client._
 import org.apache.hadoop.hbase.{HBaseConfiguration, TableName}
 import ru.wobot.etl.dto.DetailedPostDto
 import ru.wobot.etl.flink.HBaseConstants.Tables
@@ -17,18 +17,16 @@ object HBase extends App {
   val postsToProcess = env.createInput(InputFormat.postToProcess)
   val profiles = env.createInput(InputFormat.profilesStore)
 
-  val connection: Connection = ConnectionFactory.createConnection(HBaseConfiguration.create)
-  val admin = connection.getAdmin()
-
+  val admin = new HBaseAdmin(HBaseConfiguration.create)
   def disableTable(name: TableName) = {
     if (admin.isTableEnabled(name))
       admin.disableTable(name)
   }
-  def truncateTable(name: TableName): Unit ={
+
+  def truncateTable(name: TableName): Unit = {
     disableTable(name)
     admin.truncateTable(name, true)
   }
-
 
   updateProfileView(env, profilesToProcess, profiles, OutputFormat.profilesStore)
   updatePostView(env, postsToProcess, profiles)
