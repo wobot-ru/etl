@@ -3,7 +3,7 @@ package ru.wobot
 import org.apache.flink.api.scala.typeutils.CaseClassTypeInfo
 import org.apache.flink.api.scala.{createTypeInformation => _}
 import org.apache.flink.streaming.api.scala._
-import ru.wobot.etl.dto.{PostDto, ProfileDto}
+import ru.wobot.etl.dto.{DetailedPostDto, PostDto, ProfileDto}
 
 package object etl {
   implicit val postTI = createTypeInformation[Post].asInstanceOf[CaseClassTypeInfo[Post]]
@@ -22,4 +22,6 @@ package object etl {
   case class ExtractedPaths(profiles: Option[String], posts: Option[String])
 
   case class ProfileOrPost(url: String, crawlDate: Long, profile: Option[ProfileDto], post: Option[PostDto]) extends Document
+
+  case class DetailedOrWithoutAuthorPost(detailed:Option[DetailedPostDto], withoutAuthor:Option[Post])
 }

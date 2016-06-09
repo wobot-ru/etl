@@ -10,23 +10,32 @@ import org.apache.hadoop.hbase.util.Bytes
 import ru.wobot.etl.Profile
 import org.apache.flink.configuration.Configuration
 import ru.wobot.etl._
+import ru.wobot.etl.dto.DetailedPostDto
 
 object OutputFormat {
-  def profilesToProces() = new HBaseOutputFormat[Profile](HBaseConstants.T_PROFILE_TO_ADD, p => {
+  def postsToES() = new HBaseOutputFormat[DetailedPostDto](HBaseConstants.T_POST_TO_ES, p => {
+    new Put(Bytes.toBytes(s"${p.id}"))
+      .add(HBaseConstants.CF_ID, HBaseConstants.C_ID, Bytes.toBytes(p.id))
+      .add(HBaseConstants.CF_ID, HBaseConstants.C_CRAWL_DATE, Bytes.toBytes(p.crawlDate))
+      .add(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.toJson))
+  })
+
+
+  def profilesToProces() = new HBaseOutputFormat[Profile](HBaseConstants.T_PROFILE_TO_PROCESS, p => {
     new Put(Bytes.toBytes(s"${p.url}|${p.crawlDate}"))
       .add(HBaseConstants.CF_ID, HBaseConstants.C_ID, Bytes.toBytes(p.url))
       .add(HBaseConstants.CF_ID, HBaseConstants.C_CRAWL_DATE, Bytes.toBytes(p.crawlDate))
       .add(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.profile.toJson))
   })
 
-  def profilesStore() = new HBaseOutputFormat[Profile](HBaseConstants.T_PROFILE, p => {
+  def profilesStore() = new HBaseOutputFormat[Profile](HBaseConstants.T_PROFILE_VIEW, p => {
     new Put(Bytes.toBytes(s"${p.url}"))
       .add(HBaseConstants.CF_ID, HBaseConstants.C_ID, Bytes.toBytes(p.url))
       .add(HBaseConstants.CF_ID, HBaseConstants.C_CRAWL_DATE, Bytes.toBytes(p.crawlDate))
       .add(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.profile.toJson))
   })
 
-  def postsToProces() = new HBaseOutputFormat[Post](HBaseConstants.T_POST,
+  def postsToProces() = new HBaseOutputFormat[Post](HBaseConstants.T_POST_TO_PROCESS,
     p => {
       new Put(Bytes.toBytes(s"${p.url}|${p.crawlDate}"))
         .add(HBaseConstants.CF_ID, HBaseConstants.C_ID, Bytes.toBytes(p.url))
@@ -34,7 +43,15 @@ object OutputFormat {
         .add(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.post.toJson))
     })
 
-  class HBaseOutputFormat[T <: Document](tableName: String, write: T => Put) extends OutputFormat[T] {
+  def postsWithoutProfile() = new HBaseOutputFormat[Post](HBaseConstants.T_POST_WITHOUT_PROFILE,
+    p => {
+      new Put(Bytes.toBytes(s"${p.url}|${p.crawlDate}"))
+        .add(HBaseConstants.CF_ID, HBaseConstants.C_ID, Bytes.toBytes(p.url))
+        .add(HBaseConstants.CF_ID, HBaseConstants.C_CRAWL_DATE, Bytes.toBytes(p.crawlDate))
+        .add(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.post.toJson))
+    })
+
+  class HBaseOutputFormat[T](tableName: String, write: T => Put) extends OutputFormat[T] {
     private var conf: HbaseConf = null
     private var table: HTable = null
 
