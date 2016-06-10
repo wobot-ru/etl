@@ -6,6 +6,9 @@ import ru.wobot.etl.flink.nutch.Nutch
 object Runner extends App {
   val params = ParameterTool.fromArgs(args)
 
+  if (params.has("smokes"))
+    Smokes.main(args)
+
   if (params.has("kafka")) {
     println("Run kafka")
     Kafka.main(args)
