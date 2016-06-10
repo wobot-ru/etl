@@ -9,6 +9,7 @@ import org.apache.nutch.util.HadoopFSUtil
 
 object Nutch {
   def main(args: Array[String]): Unit = {
+    println("Run nutch")
     val startTime = System.currentTimeMillis()
     val params = ParameterTool.fromArgs(args)
     val properties = params.getProperties

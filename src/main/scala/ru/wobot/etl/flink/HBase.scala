@@ -12,6 +12,7 @@ import ru.wobot.etl.{DetailedOrWithoutAuthorPost, Post, Profile}
 
 object HBase {
   def main(args: Array[String]): Unit = {
+    println("Run hbase")
     val env = ExecutionEnvironment.getExecutionEnvironment
     val profilesToProcess = env.createInput(InputFormat.profileToProcess)
     val postsToProcess = env.createInput(InputFormat.postToProcess)

@@ -11,6 +11,7 @@ object Kafka {
   val stream = StreamExecutionEnvironment.getExecutionEnvironment
 
   def main(args: Array[String]): Unit = {
+    println("Run kafka")
     stream.setStreamTimeCharacteristic(TimeCharacteristic.IngestionTime)
     val params = ParameterTool.fromArgs(args)
     val properties = params.getProperties

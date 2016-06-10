@@ -13,6 +13,7 @@ import org.apache.nutch.segment.SegmentChecker
 
 object Smokes {
   def main(args: Array[String]): Unit = {
+    println("Run smokes")
     println("1 - ok")
     t2()
     t3(args)
