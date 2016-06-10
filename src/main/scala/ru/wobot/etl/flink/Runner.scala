@@ -5,9 +5,12 @@ import ru.wobot.etl.flink.nutch.Nutch
 
 object Runner {
   def main(args: Array[String]): Unit = {
+    println("Usages: --smokes --kafka --nutch [--nutch-extract --nutch-publish] --hbase")
+
     val params = ParameterTool.fromArgs(args)
 
     if (params.has("smokes"))
+      println("Run smokes")
       Smokes.main(args)
 
     if (params.has("kafka")) {

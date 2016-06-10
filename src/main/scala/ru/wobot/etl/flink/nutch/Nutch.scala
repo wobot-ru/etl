@@ -17,16 +17,24 @@ object Nutch {
     //    stream.getConfig.setRestartStrategy(RestartStrategies.fixedDelayRestart(4, 10000))
     //    stream.enableCheckpointing(5000)
 
-    val extractor = new Extractor(ExecutionEnvironment.getExecutionEnvironment)
-    val publisher = new Publisher(StreamExecutionEnvironment.getExecutionEnvironment, properties)
+    val extractor =
+      if (params.has("nutch-extract")) new Extractor(ExecutionEnvironment.getExecutionEnvironment)
+      else null
+
+    val publisher =
+      if (params.has("nutch-publish")) new Publisher(StreamExecutionEnvironment.getExecutionEnvironment, properties)
+      else null
 
     def addSegment(segmentPath: Path): Unit = {
-      val paths = extractor.addSegment(segmentPath)
-      paths.posts match {
-        case Some(p) => publisher.publishPosts(p)
-      }
-      paths.profiles match {
-        case Some(p) => publisher.publishProfiles(p)
+      val postPath = new Path(segmentPath, "parse-posts").toString
+      val profilePath = new Path(segmentPath, "parse-profiles").toString
+
+      if (extractor != null)
+        extractor.addSegment(segmentPath, postPath, profilePath)
+
+      if (publisher != null) {
+        publisher.publishPosts(postPath)
+        publisher.publishProfiles(profilePath)
       }
     }
 
@@ -42,8 +50,10 @@ object Nutch {
       addSegment(new Path(params.getRequired("seg")))
 
     try {
-      extractor.execute()
-      publisher.execute()
+      if (extractor != null)
+        extractor.execute()
+      if (publisher != null)
+        publisher.execute()
     }
     finally {
       val elapsedTime = System.currentTimeMillis() - startTime

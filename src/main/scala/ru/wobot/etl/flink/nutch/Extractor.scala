@@ -36,7 +36,7 @@ class Extractor(val batch: ExecutionEnvironment) {
     }
   }
 
-  def addSegment(segmentPath: Path): ExtractedPaths = {
+  def addSegment(segmentPath: Path, postPath:String, profilePath:String): Unit = {
     val exportJob = org.apache.hadoop.mapreduce.Job.getInstance()
     val fs = segmentPath.getFileSystem(exportJob.getConfiguration)
     if (SegmentChecker.isIndexable(segmentPath, fs)) {
@@ -142,13 +142,8 @@ class Extractor(val batch: ExecutionEnvironment) {
       val posts = unic.filter(x => x.post.isDefined).map(r => Post(r.url, r.crawlDate, r.post.get))
       val profiles = unic.filter(x => x.profile.isDefined).map(r => Profile(r.url, r.crawlDate, r.profile.get))
 
-      val postPath = new Path(segmentPath, "parse-posts").toString
       posts.write(new TypeSerializerOutputFormat[Post], postPath, WriteMode.OVERWRITE)
-      val profilePath = new Path(segmentPath, "parse-profiles").toString
       profiles.write(new TypeSerializerOutputFormat[Profile], profilePath, WriteMode.OVERWRITE)
-      ExtractedPaths(Some(profilePath), Some(postPath))
     }
-    else
-      ExtractedPaths(None, None)
   }
 }
