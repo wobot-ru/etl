@@ -19,9 +19,11 @@ object Runner {
     }
     else {
       if (params.has("nutch"))
+        println("Run nutch")
         Nutch.main(args)
 
       if (params.has("hbase"))
+        println("Run hbase")
         HBase.main(args)
     }
   }
