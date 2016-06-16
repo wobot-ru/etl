@@ -15,6 +15,7 @@ import org.apache.nutch.metadata.Metadata
 import org.apache.nutch.parse.{ParseData, ParseText}
 import org.apache.nutch.segment.SegmentChecker
 import org.apache.nutch.util.StringUtil
+import org.slf4j.{Logger, LoggerFactory}
 import ru.wobot.etl._
 import ru.wobot.etl.dto.{PostDto, ProfileDto}
 import ru.wobot.sm.core.mapping.{PostProperties, ProfileProperties}
@@ -22,11 +23,12 @@ import ru.wobot.sm.core.meta.ContentMetaConstants
 import ru.wobot.sm.core.parse.ParseResult
 
 class Extractor(val batch: ExecutionEnvironment) {
+  private val LOGGER = LoggerFactory.getLogger(classOf[Extractor])
   batch.getConfig.enableForceKryo()
 
   def execute(): Unit = {
     try {
-      batch.execute("Exporting data from segments...")
+      batch.execute("Export data from segments...")
     }
     catch {
       case e: RuntimeException =>
@@ -40,7 +42,7 @@ class Extractor(val batch: ExecutionEnvironment) {
     val exportJob = org.apache.hadoop.mapreduce.Job.getInstance()
     val fs = segmentPath.getFileSystem(exportJob.getConfiguration)
     if (SegmentChecker.isIndexable(segmentPath, fs)) {
-      println("Export segment: " + segmentPath)
+      LOGGER.info(s"Extract segment: $segmentPath")
       org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(exportJob, new Path(segmentPath, CrawlDatum.FETCH_DIR_NAME))
       org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(exportJob, new Path(segmentPath, CrawlDatum.PARSE_DIR_NAME))
       org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(exportJob, new Path(segmentPath, ParseData.DIR_NAME))

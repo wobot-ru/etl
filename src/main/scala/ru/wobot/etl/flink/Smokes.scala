@@ -4,7 +4,11 @@ import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.api.scala.hadoop.mapreduce.HadoopInputFormat
 import org.apache.flink.api.scala.{ExecutionEnvironment, _}
 import org.apache.flink.util.Collector
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.hadoop.hbase.{HBaseConfiguration, HTableDescriptor}
+import org.apache.hadoop.hbase.client.{HBaseAdmin, HTable, Put}
+import org.apache.hadoop.hbase.util.Bytes
 import org.apache.hadoop.io.{Text, Writable}
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat
 import org.apache.nutch.crawl.{CrawlDatum, NutchWritable}
@@ -12,12 +16,14 @@ import org.apache.nutch.parse.{ParseData, ParseText}
 import org.apache.nutch.segment.SegmentChecker
 
 object Smokes {
+
   def main(args: Array[String]): Unit = {
     println("Run smokes")
     println("1 - ok")
     t2()
     t3(args)
     t4(args)
+    tHbase(args)
   }
 
 
@@ -86,5 +92,20 @@ object Smokes {
     }
 
     println("4 - ok")
+  }
+
+
+
+  def tHbase(args: Array[String]): Unit = {
+    val conf: Configuration = HBaseConfiguration.create
+    HBaseAdmin.checkHBaseAvailable(conf)
+
+    val table = new HTable(conf, "test-flink")
+    val put = new Put(Bytes.toBytes("id1"))
+    put.add(Bytes.toBytes("data"), Bytes.toBytes("text"), Bytes.toBytes("trololo"))
+    table.put(put)
+    table.flushCommits()
+    table.close()
+    println("5 - HBase ok")
   }
 }
