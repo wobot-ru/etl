@@ -26,9 +26,9 @@ class Extractor(val batch: ExecutionEnvironment) {
   private val LOGGER = LoggerFactory.getLogger(classOf[Extractor])
   batch.getConfig.enableForceKryo()
 
-  def execute(): Unit = {
+  def execute(segmentPath : String): Unit = {
     try {
-      batch.execute("Export data from segments...")
+      batch.execute(s"Export data from segment $segmentPath")
     }
     catch {
       case e: RuntimeException =>
@@ -57,7 +57,7 @@ class Extractor(val batch: ExecutionEnvironment) {
         }
       })
 
-      val data = map.groupBy(0).reduceGroup((tuples: Iterator[(Text, NutchWritable)], out: Collector[ProfileOrPost]) => {
+      val data = map.rebalance().groupBy(0).reduceGroup((tuples: Iterator[(Text, NutchWritable)], out: Collector[ProfileOrPost]) => {
         val gson = new Gson()
         def fromJson[T](json: String, clazz: Class[T]): T = {
           return gson.fromJson(json, clazz)

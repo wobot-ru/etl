@@ -2,6 +2,7 @@ package ru.wobot.etl.flink.nutch
 
 import java.util.Properties
 
+import org.apache.flink.api.common.JobExecutionResult
 import org.apache.flink.api.java.io.TypeSerializerInputFormat
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer09
@@ -25,7 +26,7 @@ class Publisher(stream: StreamExecutionEnvironment, properties: Properties, topi
       .addSink(new FlinkKafkaProducer09[Post](topicPost, new TypeInformationSerializationSchema[Post](postTI, stream.getConfig), properties))
   }
 
-  def execute() = {
-    stream.execute("Publish to kafka...")
+  def execute(segmentPath : String) = {
+    val execute = stream.execute(s"Publish to kafka $segmentPath")
   }
 }
