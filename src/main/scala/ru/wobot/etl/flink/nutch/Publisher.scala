@@ -2,31 +2,55 @@ package ru.wobot.etl.flink.nutch
 
 import java.util.Properties
 
-import org.apache.flink.api.common.JobExecutionResult
+import org.apache.flink.api.common.restartstrategy.RestartStrategies
 import org.apache.flink.api.java.io.TypeSerializerInputFormat
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer09
 import org.apache.flink.streaming.util.serialization.TypeInformationSerializationSchema
+import org.apache.hadoop.fs.{FileSystem, Path}
+import org.slf4j.LoggerFactory
 import ru.wobot.etl._
 
+import scala.collection.mutable.ListBuffer
 
-class Publisher(stream: StreamExecutionEnvironment, properties: Properties, topicPost: String, topicProfile: String) {
 
+class Publisher(stream: StreamExecutionEnvironment, properties: Properties, fs: FileSystem, topicPost: String, topicProfile: String) {
+  private val LOGGER = LoggerFactory.getLogger(classOf[Publisher])
+
+  stream.getConfig.setRestartStrategy(RestartStrategies.fixedDelayRestart(4, 15000))
+  stream.enableCheckpointing(3000)
+
+  val posts = ListBuffer[String]()
+  val profiles = ListBuffer[String]()
   stream.getConfig.enableForceKryo()
 
-  def publishProfiles(profiles: String) = {
-    stream
-      .readFile(new TypeSerializerInputFormat[Profile](profileTI), profiles)
-      .addSink(new FlinkKafkaProducer09[Profile](topicProfile, new TypeInformationSerializationSchema[Profile](profileTI, stream.getConfig), properties))
+  def publishProfiles(profile: String) = {
+    profiles += profile
   }
 
-  def publishPosts(posts: String) = {
-    stream
-      .readFile(new TypeSerializerInputFormat[Post](postTI), posts)
-      .addSink(new FlinkKafkaProducer09[Post](topicPost, new TypeInformationSerializationSchema[Post](postTI, stream.getConfig), properties))
+  def publishPosts(post: String) = {
+    posts += post
   }
 
-  def execute(segmentPath : String) = {
+  def execute(segmentPath: String) = {
+    for (post <- posts) {
+      if (fs.exists(new Path(post))) {
+        stream
+          .readFile(new TypeSerializerInputFormat[Post](postTI), post)
+          .addSink(new FlinkKafkaProducer09[Post](topicPost, new TypeInformationSerializationSchema[Post](postTI, stream.getConfig), properties))
+      }
+      else
+        LOGGER.info(s"Skip import, file not exist: $post")
+    }
+    for (profile <- profiles) {
+      if (fs.exists(new Path(profile))) {
+        stream
+          .readFile(new TypeSerializerInputFormat[Profile](profileTI), profile)
+          .addSink(new FlinkKafkaProducer09[Profile](topicProfile, new TypeInformationSerializationSchema[Profile](profileTI, stream.getConfig), properties))
+      }
+      else
+        LOGGER.info(s"Skip import, file not exist: $profile")
+    }
     val execute = stream.execute(s"Publish to kafka $segmentPath")
   }
 }

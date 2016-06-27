@@ -42,110 +42,119 @@ class Extractor(val batch: ExecutionEnvironment) {
     val exportJob = org.apache.hadoop.mapreduce.Job.getInstance()
     val fs = segmentPath.getFileSystem(exportJob.getConfiguration)
     if (SegmentChecker.isIndexable(segmentPath, fs)) {
-      LOGGER.info(s"Extract segment: $segmentPath")
-      org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(exportJob, new Path(segmentPath, CrawlDatum.FETCH_DIR_NAME))
-      org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(exportJob, new Path(segmentPath, CrawlDatum.PARSE_DIR_NAME))
-      org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(exportJob, new Path(segmentPath, ParseData.DIR_NAME))
-      org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(exportJob, new Path(segmentPath, ParseText.DIR_NAME))
+      val fetchDir: Path = new Path(segmentPath, CrawlDatum.FETCH_DIR_NAME)
+      val parseDir: Path = new Path(segmentPath, CrawlDatum.PARSE_DIR_NAME)
+      val parseData: Path = new Path(segmentPath, ParseData.DIR_NAME)
+      val parseText: Path = new Path(segmentPath, ParseText.DIR_NAME)
 
-      val input = batch.createInput(new HadoopInputFormat[Text, NutchWritable](new SequenceFileInputFormat[Text, NutchWritable], classOf[Text], classOf[NutchWritable], exportJob))
-      val map = input.flatMap((t: (Text, Writable), out: Collector[(Text, NutchWritable)]) => {
-        t._2 match {
-          case c: CrawlDatum => if (c.getStatus == CrawlDatum.STATUS_FETCH_SUCCESS) out.collect((t._1, new NutchWritable(t._2)))
-          case c: ParseData => if (c.getStatus.isSuccess) out.collect((t._1, new NutchWritable(t._2)))
-          case c: ParseText => out.collect((t._1, new NutchWritable(t._2)))
-        }
-      })
+      if (fs.exists(fetchDir) && fs.exists(parseDir) && fs.exists(parseData) && fs.exists(parseText)) {
+        LOGGER.info(s"Extract segment: $segmentPath")
+        org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(exportJob, fetchDir)
+        org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(exportJob, parseDir)
+        org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(exportJob, parseData)
+        org.apache.hadoop.mapreduce.lib.input.FileInputFormat.addInputPath(exportJob, parseText)
 
-      val data = map.rebalance().groupBy(0).reduceGroup((tuples: Iterator[(Text, NutchWritable)], out: Collector[ProfileOrPost]) => {
-        val gson = new Gson()
-        def fromJson[T](json: String, clazz: Class[T]): T = {
-          return gson.fromJson(json, clazz)
-        }
-
-        var key: String = null
-        var fetchDatum: CrawlDatum = null
-        var parseData: ParseData = null
-        var parseText: ParseText = null
-
-        for ((url, data) <- tuples) {
-          data.get() match {
-            case c: CrawlDatum => {
-              key = url.toString
-              fetchDatum = c
-            }
-            case d: ParseData => parseData = d
-            case t: ParseText => parseText = t
-            case _ => ()
+        val input = batch.createInput(new HadoopInputFormat[Text, NutchWritable](new SequenceFileInputFormat[Text, NutchWritable], classOf[Text], classOf[NutchWritable], exportJob))
+        val map = input.flatMap((t: (Text, Writable), out: Collector[(Text, NutchWritable)]) => {
+          t._2 match {
+            case c: CrawlDatum => if (c.getStatus == CrawlDatum.STATUS_FETCH_SUCCESS) out.collect((t._1, new NutchWritable(t._2)))
+            case c: ParseData => if (c.getStatus.isSuccess) out.collect((t._1, new NutchWritable(t._2)))
+            case c: ParseText => out.collect((t._1, new NutchWritable(t._2)))
           }
-        }
-        if (parseData != null && fetchDatum != null) {
-          val contentMeta = parseData.getContentMeta
-          val skipFromElastic: String = contentMeta.get(ContentMetaConstants.SKIP_FROM_ELASTIC_INDEX)
-          if (skipFromElastic == null || !skipFromElastic.equals("1")) {
-            val fetchTime: Long = fetchDatum.getFetchTime
-            val crawlDate: String = fetchTime.toString
-            val segment = contentMeta.get(org.apache.nutch.metadata.Nutch.SEGMENT_NAME_KEY);
-            val isSingleDoc: Boolean = !"true".equals(contentMeta.get(ContentMetaConstants.MULTIPLE_PARSE_RESULT))
-            if (isSingleDoc) {
-              val parseMeta: Metadata = parseData.getParseMeta
-              val subType = contentMeta.get(ContentMetaConstants.TYPE);
-              if (subType != null && subType.equals(ru.wobot.sm.core.mapping.Types.PROFILE)) {
-                val profile = new ProfileDto(key,
-                  segment,
-                  crawlDate,
-                  parseMeta.get(ProfileProperties.HREF),
-                  parseMeta.get(ProfileProperties.SOURCE),
-                  parseMeta.get(ProfileProperties.SM_PROFILE_ID),
-                  parseMeta.get(ProfileProperties.NAME),
-                  parseMeta.get(ProfileProperties.CITY),
-                  parseMeta.get(ProfileProperties.REACH),
-                  parseMeta.get(ProfileProperties.FRIEND_COUNT),
-                  parseMeta.get(ProfileProperties.FOLLOWER_COUNT),
-                  parseMeta.get(ProfileProperties.GENDER)
-                )
-                out.collect(ProfileOrPost(profile.id, fetchTime, Some(profile), None))
-              }
-            }
-            else if (parseText != null) {
-              val content: String = parseText.getText()
-              if (!StringUtil.isEmpty(content)) {
-                val parseResults: Array[ParseResult] = fromJson[Array[ParseResult]](parseText.getText, classOf[Array[ParseResult]])
-                if (parseResults != null) for (parseResult <- parseResults) {
-                  var subType: String = parseResult.getContentMeta.get(ContentMetaConstants.TYPE).asInstanceOf[String]
-                  if (subType == null) subType = parseData.getContentMeta.get(ContentMetaConstants.TYPE)
-                  if (subType == ru.wobot.sm.core.mapping.Types.POST) {
-                    val parseMeta = parseResult.getParseMeta
-                    val post = new PostDto(id = parseResult.getUrl,
-                      segment = segment,
-                      crawlDate = crawlDate,
-                      href = parseResult.getUrl,
-                      source = parseMeta.get(ProfileProperties.SOURCE).asInstanceOf[String],
-                      profileId = parseMeta.get(PostProperties.PROFILE_ID).asInstanceOf[String],
-                      smPostId = String.valueOf(parseMeta.get(PostProperties.SM_POST_ID)).replace(".0", ""),
-                      parentPostId = parseMeta.get(PostProperties.PARENT_POST_ID).asInstanceOf[String],
-                      body = parseMeta.get(PostProperties.BODY).asInstanceOf[String],
-                      date = parseMeta.get(PostProperties.POST_DATE).asInstanceOf[String],
-                      engagement = String.valueOf(parseMeta.get(PostProperties.ENGAGEMENT)).replace(".0", ""),
-                      isComment = parseMeta.get(PostProperties.IS_COMMENT).asInstanceOf[Boolean]
-                    )
+        })
 
-                    out.collect(ProfileOrPost(post.id, fetchTime, None, Some(post)))
+        val data = map.rebalance().groupBy(0).reduceGroup((tuples: Iterator[(Text, NutchWritable)], out: Collector[ProfileOrPost]) => {
+          val gson = new Gson()
+          def fromJson[T](json: String, clazz: Class[T]): T = {
+            return gson.fromJson(json, clazz)
+          }
+
+          var key: String = null
+          var fetchDatum: CrawlDatum = null
+          var parseData: ParseData = null
+          var parseText: ParseText = null
+
+          for ((url, data) <- tuples) {
+            data.get() match {
+              case c: CrawlDatum => {
+                key = url.toString
+                fetchDatum = c
+              }
+              case d: ParseData => parseData = d
+              case t: ParseText => parseText = t
+              case _ => ()
+            }
+          }
+          if (parseData != null && fetchDatum != null) {
+            val contentMeta = parseData.getContentMeta
+            val skipFromElastic: String = contentMeta.get(ContentMetaConstants.SKIP_FROM_ELASTIC_INDEX)
+            if (skipFromElastic == null || !skipFromElastic.equals("1")) {
+              val fetchTime: Long = fetchDatum.getFetchTime
+              val crawlDate: String = fetchTime.toString
+              val segment = contentMeta.get(org.apache.nutch.metadata.Nutch.SEGMENT_NAME_KEY);
+              val isSingleDoc: Boolean = !"true".equals(contentMeta.get(ContentMetaConstants.MULTIPLE_PARSE_RESULT))
+              if (isSingleDoc) {
+                val parseMeta: Metadata = parseData.getParseMeta
+                val subType = contentMeta.get(ContentMetaConstants.TYPE);
+                if (subType != null && subType.equals(ru.wobot.sm.core.mapping.Types.PROFILE)) {
+                  val profile = new ProfileDto(key,
+                    segment,
+                    crawlDate,
+                    parseMeta.get(ProfileProperties.HREF),
+                    parseMeta.get(ProfileProperties.SOURCE),
+                    parseMeta.get(ProfileProperties.SM_PROFILE_ID),
+                    parseMeta.get(ProfileProperties.NAME),
+                    parseMeta.get(ProfileProperties.CITY),
+                    parseMeta.get(ProfileProperties.REACH),
+                    parseMeta.get(ProfileProperties.FRIEND_COUNT),
+                    parseMeta.get(ProfileProperties.FOLLOWER_COUNT),
+                    parseMeta.get(ProfileProperties.GENDER)
+                  )
+                  out.collect(ProfileOrPost(profile.id, fetchTime, Some(profile), None))
+                }
+              }
+              else if (parseText != null) {
+                val content: String = parseText.getText()
+                if (!StringUtil.isEmpty(content)) {
+                  val parseResults: Array[ParseResult] = fromJson[Array[ParseResult]](parseText.getText, classOf[Array[ParseResult]])
+                  if (parseResults != null) for (parseResult <- parseResults) {
+                    var subType: String = parseResult.getContentMeta.get(ContentMetaConstants.TYPE).asInstanceOf[String]
+                    if (subType == null) subType = parseData.getContentMeta.get(ContentMetaConstants.TYPE)
+                    if (subType == ru.wobot.sm.core.mapping.Types.POST) {
+                      val parseMeta = parseResult.getParseMeta
+                      val post = new PostDto(id = parseResult.getUrl,
+                        segment = segment,
+                        crawlDate = crawlDate,
+                        href = parseResult.getUrl,
+                        source = parseMeta.get(ProfileProperties.SOURCE).asInstanceOf[String],
+                        profileId = parseMeta.get(PostProperties.PROFILE_ID).asInstanceOf[String],
+                        smPostId = String.valueOf(parseMeta.get(PostProperties.SM_POST_ID)).replace(".0", ""),
+                        parentPostId = parseMeta.get(PostProperties.PARENT_POST_ID).asInstanceOf[String],
+                        body = parseMeta.get(PostProperties.BODY).asInstanceOf[String],
+                        date = parseMeta.get(PostProperties.POST_DATE).asInstanceOf[String],
+                        engagement = String.valueOf(parseMeta.get(PostProperties.ENGAGEMENT)).replace(".0", ""),
+                        isComment = parseMeta.get(PostProperties.IS_COMMENT).asInstanceOf[Boolean]
+                      )
+
+                      out.collect(ProfileOrPost(post.id, fetchTime, None, Some(post)))
+                    }
                   }
                 }
               }
             }
           }
-        }
-      })
+        })
 
 
-      val unic = data.sortPartition(0, Order.ASCENDING)
-      val posts = unic.filter(x => x.post.isDefined).map(r => Post(r.url, r.crawlDate, r.post.get))
-      val profiles = unic.filter(x => x.profile.isDefined).map(r => Profile(r.url, r.crawlDate, r.profile.get))
+        val unic = data.sortPartition(0, Order.ASCENDING)
+        val posts = unic.filter(x => x.post.isDefined).map(r => Post(r.url, r.crawlDate, r.post.get))
+        val profiles = unic.filter(x => x.profile.isDefined).map(r => Profile(r.url, r.crawlDate, r.profile.get))
 
-      posts.write(new TypeSerializerOutputFormat[Post], postPath, WriteMode.OVERWRITE)
-      profiles.write(new TypeSerializerOutputFormat[Profile], profilePath, WriteMode.OVERWRITE)
+        posts.write(new TypeSerializerOutputFormat[Post], postPath, WriteMode.OVERWRITE)
+        profiles.write(new TypeSerializerOutputFormat[Profile], profilePath, WriteMode.OVERWRITE)
+      }
+      else
+        LOGGER.info(s"Skip segment: $segmentPath")
     }
   }
 }

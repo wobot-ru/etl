@@ -25,8 +25,8 @@ object Kafka {
     //properties.setProperty("auto.offset.reset", "earliest")
 
 
-    val profiles = stream.addSource(new FlinkKafkaConsumer09[Profile]("profile", new TypeInformationSerializationSchema[Profile](profileTI, stream.getConfig), properties))
-    val posts = stream.addSource(new FlinkKafkaConsumer09[Post]("post", new TypeInformationSerializationSchema[Post](postTI, stream.getConfig), properties))
+    val profiles = stream.addSource(new FlinkKafkaConsumer09[Profile](params.getRequired(Params.TOPIC_PROFILE), new TypeInformationSerializationSchema[Profile](profileTI, stream.getConfig), properties))
+    val posts = stream.addSource(new FlinkKafkaConsumer09[Post](params.getRequired(Params.TOPIC_POST), new TypeInformationSerializationSchema[Post](postTI, stream.getConfig), properties))
     //
 //    val urls = posts.timeWindowAll(Time.seconds(5)).apply(new AllWindowFunction[Post, String, TimeWindow] {
 //      override def apply(w: TimeWindow, iterable: Iterable[Post], collector: Collector[String]): Unit = {

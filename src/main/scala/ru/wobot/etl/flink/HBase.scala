@@ -25,8 +25,8 @@ object HBase {
     val profilesToProcess = env.createInput(InputFormat.profileToProcess)
     val profiles = env.createInput(InputFormat.profilesStore)
     updateProfileView(env, profilesToProcess, profiles, OutputFormat.profilesStore)
-//    val postsToProcess = env.createInput(InputFormat.postToProcess)
-//    updatePostView(env, postsToProcess, profiles)
+    val postsToProcess = env.createInput(InputFormat.postToProcess)
+    updatePostView(env, postsToProcess, profiles)
     env.execute("Build Hbase views")
   }
 
