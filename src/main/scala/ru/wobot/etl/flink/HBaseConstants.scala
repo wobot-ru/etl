@@ -14,6 +14,7 @@ object HBaseConstants {
   val T_PROFILE_TO_PROCESS = "profile-to-process"
   val T_POST_TO_PROCESS = "post-to-process"
   val T_POST_TO_ES = "post-to-es"
+  val T_POST_VIEW = "post"
   val T_POST_WITHOUT_PROFILE = "post-without-profile"
 
   object Tables{

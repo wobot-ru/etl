@@ -20,6 +20,13 @@ object OutputFormat {
       .add(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.toJson))
   })
 
+  def postsStore() = new HBaseOutputFormat[Post](HBaseConstants.T_POST_VIEW, p => {
+    new Put(Bytes.toBytes(s"${p.url}"))
+      .add(HBaseConstants.CF_ID, HBaseConstants.C_ID, Bytes.toBytes(p.url))
+      .add(HBaseConstants.CF_ID, HBaseConstants.C_CRAWL_DATE, Bytes.toBytes(p.crawlDate))
+      .add(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.post.toJson))
+  })
+
 
   def profilesToProces() = new HBaseOutputFormat[Profile](HBaseConstants.T_PROFILE_TO_PROCESS, p => {
     new Put(Bytes.toBytes(s"${p.url}|${p.crawlDate}"))
@@ -34,6 +41,7 @@ object OutputFormat {
       .add(HBaseConstants.CF_ID, HBaseConstants.C_CRAWL_DATE, Bytes.toBytes(p.crawlDate))
       .add(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.profile.toJson))
   })
+
 
   def postsToProces() = new HBaseOutputFormat[Post](HBaseConstants.T_POST_TO_PROCESS,
     p => {

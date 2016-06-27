@@ -2,6 +2,7 @@ package ru.wobot.etl.flink
 
 import org.apache.flink.api.common.operators.Order
 import org.apache.flink.api.common.operators.base.JoinOperatorBase.JoinHint
+import org.apache.flink.api.common.restartstrategy.RestartStrategies
 import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.api.scala.{ExecutionEnvironment, _}
 import org.apache.flink.util.Collector
@@ -21,18 +22,19 @@ object HBase {
     val params = ParameterTool.fromArgs(args)
     val env = ExecutionEnvironment.getExecutionEnvironment
     env.getConfig.enableForceKryo()
-    env.getConfig.enableSysoutLogging()
+    //env.getConfig.enableSysoutLogging()
+    env.getConfig.setRestartStrategy(RestartStrategies.fixedDelayRestart(3, 120000))
 
-    val profilesToProcess = env.createInput(InputFormat.profileToProcess)
-    val profiles = env.createInput(InputFormat.profilesStore)
     if (params.has("hbase-build-profile"))
-      updateProfileView(env, profilesToProcess, profiles, OutputFormat.profilesStore)
-    val postsToProcess = env.createInput(InputFormat.postToProcess)
+      updateProfileView(env, env.createInput(InputFormat.profileToProcess), env.createInput(InputFormat.profilesStore), OutputFormat.profilesStore)
     if (params.has("hbase-build-post"))
-      updatePostView(env, postsToProcess, profiles)
+      updatePostView(env, env.createInput(InputFormat.postToProcess))
+    if (params.has("hbase-build-post-join"))
+      updatePostJoinView(env, env.createInput(InputFormat.postStore()), env.createInput(InputFormat.profilesStore))
   }
 
   def updateProfileView(env: ExecutionEnvironment, processing: DataSet[Profile], saved: DataSet[Profile], profilesStore: HBaseOutputFormat[Profile]) = {
+    println("Build Profile View")
     LOGGER.info("{updateProfileView")
     val latest = processing.name("Processing profiles").groupBy(x => x.url).sortGroup(x => x.crawlDate, Order.DESCENDING).first(1)
     val toUpdate = latest.leftOuterJoin(saved).where(0).equalTo(0).apply((l: Profile, r: Profile, collector: Collector[Profile]) => {
@@ -49,10 +51,18 @@ object HBase {
     env.execute("Build Profile View")
   }
 
-  def updatePostView(env: ExecutionEnvironment, processing: DataSet[Post], profiles: DataSet[Profile]) = {
+  def updatePostView(env: ExecutionEnvironment, processing: DataSet[Post]) = {
+    println("Build Post View")
     LOGGER.info("{updatePostView")
-    val latest = processing.groupBy(x => x.url).sortGroup(x => x.crawlDate, Order.DESCENDING).first(1).name("latest profiles")
-    val joined = latest
+    val latest = processing.groupBy(x => x.url).sortGroup(x => x.crawlDate, Order.DESCENDING).first(1).name("latest posts")
+    latest.output(OutputFormat postsStore)
+    env.execute("Build Post View")
+  }
+
+  def updatePostJoinView(env: ExecutionEnvironment, posts: DataSet[Post], profiles: DataSet[Profile]) = {
+    println("Build Post-Join View")
+    LOGGER.info("{updatePostJoinView")
+    val joined = posts
       .leftOuterJoin(profiles, JoinHint.REPARTITION_HASH_SECOND)
       .where(x => x.post.profileId)
       .equalTo(x => x.url)
@@ -97,7 +107,7 @@ object HBase {
     autorized.output(OutputFormat.postsToES).name("post to es")
     unAuthorized.output(OutputFormat.postsWithoutProfile).name("post without author")
     LOGGER.info("Start post update executing")
-    //env.execute("Update posts")
+    env.execute("Build PostView View")
 
     //    truncateTable(Tables.POST_TO_PROCESS)
     //    env.createInput(InputFormat.postWithoutProfile)
@@ -108,7 +118,6 @@ object HBase {
     //
     //    truncateTable(Tables.POST_WITHOUT_PROFILE)
     //    LOGGER.info("updatePostView}")
-    env.execute("Build PostView View")
   }
 
   def truncateTable(name: TableName): Unit = {
