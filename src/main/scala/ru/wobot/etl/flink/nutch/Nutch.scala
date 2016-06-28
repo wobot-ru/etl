@@ -29,7 +29,7 @@ object Nutch {
       if (params.has("nutch-publish")) new Publisher(StreamExecutionEnvironment.getExecutionEnvironment, properties, fs, params.getRequired(Params.TOPIC_POST), params.getRequired(Params.TOPIC_PROFILE))
       else null
 
-    val batchSize = params.getInt("batch-size", 10)
+    val batchSize = params.getInt("batch-size", 1)
     val startSeg = params.get("nutch-seg-start", null)
     val stopSeg = params.get("nutch-seg-stop", null)
     var segmentToAdd = 0

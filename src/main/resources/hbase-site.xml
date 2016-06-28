@@ -1,9 +1,9 @@
 <configuration>
 
-  <!--<property>-->
-    <!--<name>hbase.zookeeper.quorum</name>-->
-    <!--<value>localhost</value>-->
-  <!--</property>-->
+  <property>
+    <name>hbase.zookeeper.quorum</name>
+    <value>127.0.0.1</value>
+  </property>
 
   <property>
     <name>dfs.domain.socket.path</name>
@@ -212,7 +212,7 @@
 
   <property>
     <name>hbase.zookeeper.quorum</name>
-    <value>hdp-01,hdp-03,hdp-02</value>
+    <value>hdp-01,hdp-03,hdp-04</value>
   </property>
 
   <property>

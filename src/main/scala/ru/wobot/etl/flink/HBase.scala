@@ -6,8 +6,8 @@ import org.apache.flink.api.common.restartstrategy.RestartStrategies
 import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.api.scala.{ExecutionEnvironment, _}
 import org.apache.flink.util.Collector
-import org.apache.hadoop.hbase.{HBaseConfiguration, TableName}
 import org.apache.hadoop.hbase.client.HBaseAdmin
+import org.apache.hadoop.hbase.{HBaseConfiguration, TableName}
 import org.slf4j.{Logger, LoggerFactory}
 import ru.wobot.etl.dto.DetailedPostDto
 import ru.wobot.etl.flink.OutputFormat.HBaseOutputFormat
@@ -21,9 +21,11 @@ object HBase {
     LOGGER.info("Run hbase")
     val params = ParameterTool.fromArgs(args)
     val env = ExecutionEnvironment.getExecutionEnvironment
-    env.getConfig.enableForceKryo()
-    //env.getConfig.enableSysoutLogging()
     env.getConfig.setRestartStrategy(RestartStrategies.fixedDelayRestart(3, 120000))
+    env.getConfig.enableForceKryo()
+    //env.getConfig.enableForceAvro()
+    //env.getConfig.disableObjectReuse()
+    //env.getConfig.enableSysoutLogging()
 
     if (params.has("hbase-build-profile"))
       updateProfileView(env, env.createInput(InputFormat.profileToProcess), env.createInput(InputFormat.profilesStore), OutputFormat.profilesStore)
@@ -43,10 +45,10 @@ object HBase {
     })
 
     toUpdate.output(OutputFormat profilesStore).name("hbase profile view")
-    //    LOGGER.info(s"Add profiles=${toUpdate.count()}")
-    //    LOGGER.info("Start trunkate profile-to-process")
-    //    //truncateTable(HBaseConstants.Tables.PROFILE_TO_PROCESS)
-    //    LOGGER.info("End trunkate profile-to-process")
+    //LOGGER.info(s"Add profiles=${toUpdate.count()}")
+    //LOGGER.info("Start trunkate profile-to-process")
+    ////truncateTable(HBaseConstants.Tables.PROFILE_TO_PROCESS)
+    //LOGGER.info("End trunkate profile-to-process")
     LOGGER.info("updateProfileView}")
     env.execute("Build Profile View")
   }
@@ -54,7 +56,7 @@ object HBase {
   def updatePostView(env: ExecutionEnvironment, processing: DataSet[Post]) = {
     println("Build Post View")
     LOGGER.info("{updatePostView")
-    val latest = processing.groupBy(x => x.url).sortGroup(x => x.crawlDate, Order.DESCENDING).first(1).name("latest posts")
+    val latest = processing.groupBy(x => x.url).sortGroup(x => x.crawlDate, Order.DESCENDING).first(1)
     latest.output(OutputFormat postsStore)
     env.execute("Build Post View")
   }
@@ -109,15 +111,14 @@ object HBase {
     LOGGER.info("Start post update executing")
     env.execute("Build PostView View")
 
-    //    truncateTable(Tables.POST_TO_PROCESS)
-    //    env.createInput(InputFormat.postWithoutProfile)
-    //      .output(OutputFormat.postsToProces()).name("posts without profiles")
+    //truncateTable(Tables.POST_TO_PROCESS)
+    //env.createInput(InputFormat.postWithoutProfile)
+    //.output(OutputFormat.postsToProces()).name("posts without profiles")
 
-    //    LOGGER.info("Start \"Restore un-joined posts\" executing")
-    //    //env.execute("Restore un-joined posts")
-    //
-    //    truncateTable(Tables.POST_WITHOUT_PROFILE)
-    //    LOGGER.info("updatePostView}")
+    //LOGGER.info("Start \"Restore un-joined posts\" executing")
+    ////env.execute("Restore un-joined posts")
+    //truncateTable(Tables.POST_WITHOUT_PROFILE)
+    //LOGGER.info("updatePostView}")
   }
 
   def truncateTable(name: TableName): Unit = {
