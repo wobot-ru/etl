@@ -56,7 +56,8 @@ object HBase {
   def updatePostView(env: ExecutionEnvironment, processing: DataSet[Post]) = {
     println("Build Post View")
     LOGGER.info("{updatePostView")
-    val latest = processing.groupBy(x => x.url).sortGroup(x => x.crawlDate, Order.DESCENDING).first(1)
+    val latest = processing.groupBy(x => (x.url, x.crawlDate)).sortGroup(x => x.crawlDate, Order.DESCENDING).first(1)
+    //val latest = processing.groupBy(x => x.url).sortGroup(x => x.crawlDate, Order.DESCENDING).first(1)
     latest.output(OutputFormat postsStore)
     env.execute("Build Post View")
   }
