@@ -18,7 +18,7 @@ class PostDto(id: String,
 
   override def toString: String = toJson()
 
-  def toJson() = JsonUtil.toJson(this)
+  def toJson(): String = JsonUtil.toJson(this)
 }
 
 class DetailedPostDto(id: String,
@@ -43,5 +43,5 @@ class DetailedPostDto(id: String,
 
   override def toString: String = toJson()
 
-  override def toJson() = JsonUtil.toJson(this)
+  override def toJson(): String = JsonUtil.toJson(this)
 }

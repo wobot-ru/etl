@@ -102,7 +102,7 @@ object HBase {
       .map(x => x.withoutAuthor.get)
       .name("post without author")
 
-    val autorized = joined
+    val autorized: DataSet[DetailedPostDto] = joined
       .filter(p => p.withoutAuthor.isEmpty)
       .map(x => x.detailed.get)
       .name("post with author")

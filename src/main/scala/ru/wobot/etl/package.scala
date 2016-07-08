@@ -8,6 +8,7 @@ import ru.wobot.etl.dto.{DetailedPostDto, PostDto, ProfileDto}
 package object etl {
   implicit val postTI = createTypeInformation[Post].asInstanceOf[CaseClassTypeInfo[Post]]
   implicit val profileTI = createTypeInformation[Profile].asInstanceOf[CaseClassTypeInfo[Profile]]
+  implicit val detailedPostTI = createTypeInformation[DetailedPost].asInstanceOf[CaseClassTypeInfo[DetailedPost]]
 
   trait Document {
     def url: String
@@ -16,6 +17,8 @@ package object etl {
   }
 
   case class Post(url: String, crawlDate: Long, post: PostDto) extends Document
+
+  case class DetailedPost(url: String, crawlDate: Long, post: DetailedPostDto) extends Document
 
   case class Profile(url: String, crawlDate: Long, profile: ProfileDto) extends Document
 
