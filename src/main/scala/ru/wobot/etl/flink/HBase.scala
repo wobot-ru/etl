@@ -80,7 +80,7 @@ object HBase {
             segment = p.segment,
             crawlDate = p.crawlDate,
             href = p.href,
-            source = p.href,
+            source = p.source,
             profileId = p.profileId,
             smPostId = p.smPostId,
             parentPostId = p.parentPostId,
