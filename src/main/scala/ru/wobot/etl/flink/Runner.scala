@@ -2,10 +2,11 @@ package ru.wobot.etl.flink
 
 import org.apache.flink.api.java.utils.ParameterTool
 import ru.wobot.etl.flink.nutch.Nutch
+import ru.wobot.etl.flink.Params._
 
 object Runner {
   def main(args: Array[String]): Unit = {
-    println("Usages: --smokes --kafka --nutch [--nutch-extract --nutch-publish] --hbase")
+    println(s"Usages: --smokes --kafka --nutch [--nutch-extract --nutch-publish] --hbase --$HBASE_EXPORT --$UPLOAD_TO_ES")
 
     val params = ParameterTool.fromArgs(args)
     if (params.has("smokes"))
@@ -19,6 +20,9 @@ object Runner {
 
       if (params.has("hbase"))
         HBase.main(args)
+
+      if (params.has(HBASE_EXPORT) || params.has(UPLOAD_TO_ES))
+        Elastic.main(args)
     }
   }
 

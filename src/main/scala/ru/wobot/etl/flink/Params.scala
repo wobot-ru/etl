@@ -9,5 +9,8 @@ object Params {
 
   val HBASE_EXPORT = "hbase-export"
   val UPLOAD_TO_ES = "upload-to-es"
+
+  val ES_HOSTS = "es-hosts"
+  val INDEX_NAME = "index-name"
   val HBASE_OUT_DIR = "hbase-out-dir"
 }
