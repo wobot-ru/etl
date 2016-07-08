@@ -97,18 +97,18 @@ class Extractor(val batch: ExecutionEnvironment) {
                 val parseMeta: Metadata = parseData.getParseMeta
                 val subType = contentMeta.get(ContentMetaConstants.TYPE);
                 if (subType != null && subType.equals(ru.wobot.sm.core.mapping.Types.PROFILE)) {
-                  val profile = new ProfileDto(key,
-                    segment,
-                    crawlDate,
-                    parseMeta.get(ProfileProperties.HREF),
-                    parseMeta.get(ProfileProperties.SOURCE),
-                    parseMeta.get(ProfileProperties.SM_PROFILE_ID),
-                    parseMeta.get(ProfileProperties.NAME),
-                    parseMeta.get(ProfileProperties.CITY),
-                    parseMeta.get(ProfileProperties.REACH),
-                    parseMeta.get(ProfileProperties.FRIEND_COUNT),
-                    parseMeta.get(ProfileProperties.FOLLOWER_COUNT),
-                    parseMeta.get(ProfileProperties.GENDER)
+                  val profile = new ProfileDto(id=key,
+                    segment = segment,
+                    crawlDate = crawlDate,
+                    href = parseMeta.get(ProfileProperties.HREF),
+                    source = parseMeta.get(ProfileProperties.SOURCE),
+                    smProfileId = parseMeta.get(ProfileProperties.SM_PROFILE_ID),
+                    name = parseMeta.get(ProfileProperties.NAME),
+                    city = parseMeta.get(ProfileProperties.CITY),
+                    reach = parseMeta.get(ProfileProperties.REACH),
+                    friendCount = parseMeta.get(ProfileProperties.FRIEND_COUNT),
+                    followerCount = parseMeta.get(ProfileProperties.FOLLOWER_COUNT),
+                    gender = parseMeta.get(ProfileProperties.GENDER)
                   )
                   out.collect(ProfileOrPost(profile.id, fetchTime, Some(profile), None))
                 }
@@ -125,7 +125,7 @@ class Extractor(val batch: ExecutionEnvironment) {
                       val post = new PostDto(id = parseResult.getUrl,
                         segment = segment,
                         crawlDate = crawlDate,
-                        href = parseResult.getUrl,
+                        href = parseMeta.get(PostProperties.HREF).asInstanceOf[String],
                         source = parseMeta.get(ProfileProperties.SOURCE).asInstanceOf[String],
                         profileId = parseMeta.get(PostProperties.PROFILE_ID).asInstanceOf[String],
                         smPostId = String.valueOf(parseMeta.get(PostProperties.SM_POST_ID)).replace(".0", ""),
