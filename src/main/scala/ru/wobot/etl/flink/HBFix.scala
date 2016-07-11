@@ -40,8 +40,8 @@ object HBFix {
 
     h.substring(5).split('/') match {
       case Array(userId, "posts", userId_postId, "comments", postId_commentId) => {
-        val postId: String = userId_postId.split("_")(1)
-        val commentId: String = postId_commentId.split("_")(1)
+        val postId: String = userId_postId.split('_')(1)
+        val commentId: String = postId_commentId.substring(postId_commentId.lastIndexOf('_')+1)
         s"https://www.facebook.com/$userId/posts/$postId?comment_id=$commentId"
       }
     }
