@@ -3,8 +3,10 @@ package ru.wobot.etl.flink
 import org.apache.flink.api.common.operators.Order
 import org.apache.flink.api.common.operators.base.JoinOperatorBase.JoinHint
 import org.apache.flink.api.common.restartstrategy.RestartStrategies
+import org.apache.flink.api.java.io.TypeSerializerOutputFormat
 import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.api.scala.{ExecutionEnvironment, _}
+import org.apache.flink.core.fs.FileSystem.WriteMode
 import org.apache.flink.util.Collector
 import org.apache.hadoop.hbase.client.HBaseAdmin
 import org.apache.hadoop.hbase.{HBaseConfiguration, TableName}
@@ -38,11 +40,11 @@ object HBase {
   def updateProfileView(env: ExecutionEnvironment, processing: DataSet[Profile], saved: DataSet[Profile], profilesStore: HBaseOutputFormat[Profile]) = {
     println("Build Profile View")
     LOGGER.info("{updateProfileView")
-    val latest = processing.name("Processing profiles").groupBy(x => x.url).sortGroup(x => x.crawlDate, Order.DESCENDING).first(1)
+    val latest = processing.name("Processing profiles").groupBy(x => x.url).sortGroup(x => x.crawlDate, Order.DESCENDING).first(1).rebalance()
     val toUpdate = latest.leftOuterJoin(saved).where(0).equalTo(0).apply((l: Profile, r: Profile, collector: Collector[Profile]) => {
       if (r == null || r.crawlDate < l.crawlDate)
         collector.collect(l)
-    })
+    }).rebalance()
 
     toUpdate.output(OutputFormat profilesStore).name("hbase profile view")
     //LOGGER.info(s"Add profiles=${toUpdate.count()}")
@@ -56,7 +58,7 @@ object HBase {
   def updatePostView(env: ExecutionEnvironment, processing: DataSet[Post]) = {
     println("Build Post View")
     LOGGER.info("{updatePostView")
-    val latest = processing.groupBy(x => (x.url, x.crawlDate)).sortGroup(x => x.crawlDate, Order.DESCENDING).first(1)
+    val latest = processing.groupBy(x => (x.url, x.crawlDate)).sortGroup(x => x.crawlDate, Order.DESCENDING).first(1).rebalance()
     //val latest = processing.groupBy(x => x.url).sortGroup(x => x.crawlDate, Order.DESCENDING).first(1)
     latest.output(OutputFormat postsStore)
     env.execute("Build Post View")
@@ -97,16 +99,24 @@ object HBase {
           collector.collect(DetailedOrWithoutAuthorPost(Some(post), None))
         }
       })
+      .rebalance()
+
+    joined.write(new TypeSerializerOutputFormat[DetailedOrWithoutAuthorPost], "file:///C:\\tmp\\flink\\join", WriteMode.OVERWRITE)
+
     val unAuthorized = joined
       .filter(p => p.withoutAuthor.isDefined)
       .map(x => x.withoutAuthor.get)
+      .rebalance()
       .name("post without author")
 
     val autorized: DataSet[DetailedPostDto] = joined
       .filter(p => p.withoutAuthor.isEmpty)
       .map(x => x.detailed.get)
+      .rebalance()
       .name("post with author")
 
+    // autorized.write(new TypeSerializerOutputFormat[DetailedPostDto], "file:///C:\\tmp\\flink\\post-to-es", WriteMode.OVERWRITE)
+    // unAuthorized.write(new TypeSerializerOutputFormat[Post], "file:///C:\\tmp\\flink\\post-without-profile", WriteMode.OVERWRITE)
     autorized.output(OutputFormat.postsToES).name("post to es")
     unAuthorized.output(OutputFormat.postsWithoutProfile).name("post without author")
     LOGGER.info("Start post update executing")
