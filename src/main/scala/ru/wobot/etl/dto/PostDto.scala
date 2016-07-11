@@ -19,4 +19,29 @@ class PostDto(id: String,
   override def toString: String = toJson()
 
   def toJson(): String = JsonUtil.toJson(this)
+
+  def copy(id: String = id,
+           segment: String = segment,
+           crawlDate: String = crawlDate,
+           href: String = href,
+           source: String = source,
+           profileId: String = profileId,
+           smPostId: String = smPostId,
+           parentPostId: String = parentPostId,
+           body: String = body,
+           date: String = date,
+           engagement: String = engagement,
+           isComment: Boolean = isComment): PostDto =
+    new PostDto(id = id,
+      segment = segment,
+      crawlDate = crawlDate,
+      href = href,
+      source = source,
+      profileId = profileId,
+      smPostId = smPostId,
+      parentPostId = parentPostId,
+      body = body,
+      date = date,
+      engagement = engagement,
+      isComment = isComment)
 }
