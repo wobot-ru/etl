@@ -15,7 +15,7 @@
         <project.build.target>1.8</project.build.target>
         <project.build.source>1.8</project.build.source>
         <scala.version>2.11.7</scala.version>
-        <flink.version>1.1-SNAPSHOT</flink.version>
+        <flink.version>1.1-WB-SNAPSHOT</flink.version>
         <scala.binary.version>2.11</scala.binary.version>
         <nutch.version>1.11</nutch.version>
     </properties>
