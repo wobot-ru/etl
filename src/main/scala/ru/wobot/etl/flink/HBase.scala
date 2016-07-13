@@ -101,7 +101,7 @@ object HBase {
       })
       .rebalance()
 
-    joined.write(new TypeSerializerOutputFormat[DetailedOrWithoutAuthorPost], "file:///C:\\tmp\\flink\\join", WriteMode.OVERWRITE)
+    //joined.write(new TypeSerializerOutputFormat[DetailedOrWithoutAuthorPost], "file:///C:\\tmp\\flink\\join", WriteMode.OVERWRITE)
 
     val unAuthorized = joined
       .filter(p => p.withoutAuthor.isDefined)
