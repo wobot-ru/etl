@@ -17,9 +17,10 @@ object HBaseConstants {
   val T_POST_VIEW = "post"
   val T_POST_WITHOUT_PROFILE = "post-without-profile"
 
-  object Tables{
+  object Tables {
     val PROFILE_TO_PROCESS = TableName.valueOf(HBaseConstants.T_PROFILE_TO_PROCESS)
     val POST_TO_PROCESS = TableName.valueOf(HBaseConstants.T_POST_TO_PROCESS)
     val POST_WITHOUT_PROFILE = TableName.valueOf(HBaseConstants.T_POST_WITHOUT_PROFILE)
   }
+
 }

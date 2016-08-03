@@ -1,8 +1,8 @@
 package ru.wobot.etl.flink
 
 import org.apache.flink.api.java.utils.ParameterTool
-import ru.wobot.etl.flink.nutch.Nutch
 import ru.wobot.etl.flink.Params._
+import ru.wobot.etl.flink.nutch.Nutch
 
 object Runner {
   def main(args: Array[String]): Unit = {
@@ -18,8 +18,7 @@ object Runner {
     else {
       if (params.has("nutch")) Nutch.main(args)
 
-      if (params.has("hbase"))
-        HBase.main(args)
+      if (params.has("hbase")) HBase.main(args)
 
       if (params.has(HBASE_EXPORT) || params.has(UPLOAD_TO_ES))
         Elastic.main(args)

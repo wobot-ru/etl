@@ -9,7 +9,7 @@ object HBFix {
     env.getConfig.enableForceKryo()
     val posts: DataSet[Post] = env.createInput(InputFormat.postStore())
     val fixedPost: DataSet[Post] = posts.map(x => x.copy(post = x.post.copy(href = fixHref(x.post.id))))
-    fixedPost.output(OutputFormat postsStore)
+    fixedPost.output(WbOutputFormat postsStore)
     env.execute("fix-post-href")
     //    val fb="fb://110522802337587/posts/110522802337587_904704769586049" //https://www.facebook.com/110522802337587/posts/904704769586049
     //    val vk="vk://id135637359/posts/2918" //http://vk.com/wall135637359_2918

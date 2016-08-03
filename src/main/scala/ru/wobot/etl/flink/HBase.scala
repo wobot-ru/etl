@@ -3,16 +3,14 @@ package ru.wobot.etl.flink
 import org.apache.flink.api.common.operators.Order
 import org.apache.flink.api.common.operators.base.JoinOperatorBase.JoinHint
 import org.apache.flink.api.common.restartstrategy.RestartStrategies
-import org.apache.flink.api.java.io.TypeSerializerOutputFormat
 import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.api.scala.{ExecutionEnvironment, _}
-import org.apache.flink.core.fs.FileSystem.WriteMode
 import org.apache.flink.util.Collector
 import org.apache.hadoop.hbase.client.HBaseAdmin
 import org.apache.hadoop.hbase.{HBaseConfiguration, TableName}
 import org.slf4j.{Logger, LoggerFactory}
 import ru.wobot.etl.dto.DetailedPostDto
-import ru.wobot.etl.flink.OutputFormat.HBaseOutputFormat
+import ru.wobot.etl.flink.WbOutputFormat.HBaseOutputFormat
 import ru.wobot.etl.{DetailedOrWithoutAuthorPost, Post, Profile}
 
 object HBase {
@@ -24,13 +22,14 @@ object HBase {
     val params = ParameterTool.fromArgs(args)
     val env = ExecutionEnvironment.getExecutionEnvironment
     env.getConfig.setRestartStrategy(RestartStrategies.fixedDelayRestart(3, 120000))
-    env.getConfig.enableForceKryo()
-    //env.getConfig.enableForceAvro()
+    //env.getConfig.enableForceKryo()
+    //env.addDefaultKryoSerializer(classOf[Profile], classOf[ProfileKryoSerializer])
+    env.getConfig.enableForceAvro()
     //env.getConfig.disableObjectReuse()
     //env.getConfig.enableSysoutLogging()
 
     if (params.has("hbase-build-profile"))
-      updateProfileView(env, env.createInput(InputFormat.profileToProcess), env.createInput(InputFormat.profilesStore), OutputFormat.profilesStore)
+      updateProfileView(env, env.createInput(InputFormat.profileToProcess), env.createInput(InputFormat.profilesStore), WbOutputFormat.profilesStore)
     if (params.has("hbase-build-post"))
       updatePostView(env, env.createInput(InputFormat.postToProcess))
     if (params.has("hbase-build-post-join"))
@@ -46,7 +45,7 @@ object HBase {
         collector.collect(l)
     }).rebalance()
 
-    toUpdate.output(OutputFormat profilesStore).name("hbase profile view")
+    toUpdate.output(WbOutputFormat profilesStore).name("hbase profile view")
     //LOGGER.info(s"Add profiles=${toUpdate.count()}")
     //LOGGER.info("Start trunkate profile-to-process")
     ////truncateTable(HBaseConstants.Tables.PROFILE_TO_PROCESS)
@@ -60,7 +59,7 @@ object HBase {
     LOGGER.info("{updatePostView")
     val latest = processing.groupBy(x => (x.url, x.crawlDate)).sortGroup(x => x.crawlDate, Order.DESCENDING).first(1).rebalance()
     //val latest = processing.groupBy(x => x.url).sortGroup(x => x.crawlDate, Order.DESCENDING).first(1)
-    latest.output(OutputFormat postsStore)
+    latest.output(WbOutputFormat postsStore)
     env.execute("Build Post View")
   }
 
@@ -117,8 +116,8 @@ object HBase {
 
     // autorized.write(new TypeSerializerOutputFormat[DetailedPostDto], "file:///C:\\tmp\\flink\\post-to-es", WriteMode.OVERWRITE)
     // unAuthorized.write(new TypeSerializerOutputFormat[Post], "file:///C:\\tmp\\flink\\post-without-profile", WriteMode.OVERWRITE)
-    autorized.output(OutputFormat.postsToES).name("post to es")
-    unAuthorized.output(OutputFormat.postsWithoutProfile).name("post without author")
+    autorized.output(WbOutputFormat.postsToES).name("post to es")
+    unAuthorized.output(WbOutputFormat.postsWithoutProfile).name("post without author")
     LOGGER.info("Start post update executing")
     env.execute("Build PostView View")
 
