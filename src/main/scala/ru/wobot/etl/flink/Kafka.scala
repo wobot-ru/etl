@@ -44,7 +44,7 @@ object Kafka {
     posts.writeUsingOutputFormat(WbOutputFormat postsToProcess).name("write posts from kafka to hbase")
     profiles.writeUsingOutputFormat(WbOutputFormat profilesToProcess).name("write profiles from kafka to hbase")
     LOGGER.info("Start export");
-    stream.execute("Insert data to hbase")
+    stream.execute("Streaming data from kafka to hbase")
   }
 
 }
