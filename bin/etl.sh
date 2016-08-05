@@ -5,6 +5,12 @@ export FLINK_HOME=/opt/flink-1.1-SNAPSHOT
 export FLINK_BIN=$FLINK_HOME/bin
 
 while true; do
+  if [ -e ".STOP" ]
+  then
+   echo "STOP file found - escaping loop"
+   break
+  fi
+
   ./kafka2hbase.sh > app_id 2>&1 &
   echo $! > consumer.pid
   sleep 1800
