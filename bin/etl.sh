@@ -10,26 +10,40 @@ while true; do
    echo "STOP file found - escaping loop"
    break
   fi
-
-  ./kafka2hbase.sh > app_id 2>&1 &
+  
+  echo `date` ": Starting streaming from Kafka to HBase"
+  ./kafka-2-hbase.sh > app_id 2>&1 &
   echo $! > consumer.pid
-  sleep 1800
+  sleep 120
 
   APP_ID=`grep "Yarn cluster with application id" app_id | awk 'END {print $NF}'`
   JOB_ID=`sed -n 's/^.*ID:\s\+\([0-9a-z]\+\).*$/\1/p' app_id | head -n1`
 
-  echo "Cancelling job" "$JOB_ID"
+  echo `date` ": Cancelling job" "$JOB_ID"
   $FLINK_BIN/flink cancel "$JOB_ID" --jobmanager yarn-cluster -yid "$APP_ID"
   rm app_id
 
-  echo "Start building HBase views on iteration "$a
+  echo `date` ": Start building HBase views..."
   ./hbase-build-view.sh
+  echo `date` ": Finish building HBase views"
 
-  echo "Start cleaning HBase processing tables..."
+
+  echo `date` ": Start indexing ..."
+  ./hbase-2-es.sh
+  echo `date` ": Finish indexing"
+
+  echo `date` ": Start cleaning HBase processing tables..."
   hbase shell <<END 
        truncate 'profile-to-process'
+       truncate 'post-to-process'
+       truncate 'post-to-es'
+       truncate 'post'
        exit
 END
-  echo "Finished cleaning HBase processing tables."
+  echo `date` ": Finish cleaning HBase processing tables"
+
+  echo `date` ": Start cleaning tmp directories..."
+  hadoop fs -rm -r -skipTrash tmp/post-to-es/*
+  echo `date` ": Finish cleaning tmp directories"
 
 done
