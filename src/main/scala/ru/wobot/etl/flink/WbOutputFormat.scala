@@ -16,14 +16,14 @@ object WbOutputFormat {
     new Put(Bytes.toBytes(s"${p.id}"))
       .addColumn(HBaseConstants.CF_ID, HBaseConstants.C_ID, Bytes.toBytes(p.id))
       .addColumn(HBaseConstants.CF_ID, HBaseConstants.C_CRAWL_DATE, Bytes.toBytes(p.crawlDate))
-      .addColumn(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.toJson()))
+      .addColumn(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.toJson))
   })
 
   def postsStore() = new HBaseOutputFormat[Post](HBaseConstants.T_POST_VIEW, p => {
     new Put(Bytes.toBytes(s"${p.url}"))
       .addColumn(HBaseConstants.CF_ID, HBaseConstants.C_ID, Bytes.toBytes(p.url))
       .addColumn(HBaseConstants.CF_ID, HBaseConstants.C_CRAWL_DATE, Bytes.toBytes(p.crawlDate))
-      .addColumn(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.post.toJson()))
+      .addColumn(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.post.toJson))
   })
 
 
@@ -47,7 +47,7 @@ object WbOutputFormat {
       new Put(Bytes.toBytes(s"${p.url}|${p.crawlDate}"))
         .addColumn(HBaseConstants.CF_ID, HBaseConstants.C_ID, Bytes.toBytes(p.url))
         .addColumn(HBaseConstants.CF_ID, HBaseConstants.C_CRAWL_DATE, Bytes.toBytes(p.crawlDate))
-        .addColumn(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.post.toJson()))
+        .addColumn(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.post.toJson))
     })
 
   def postsWithoutProfile() = new HBaseOutputFormat[Post](HBaseConstants.T_POST_WITHOUT_PROFILE,
@@ -55,7 +55,7 @@ object WbOutputFormat {
       new Put(Bytes.toBytes(s"${p.url}|${p.crawlDate}"))
         .addColumn(HBaseConstants.CF_ID, HBaseConstants.C_ID, Bytes.toBytes(p.url))
         .addColumn(HBaseConstants.CF_ID, HBaseConstants.C_CRAWL_DATE, Bytes.toBytes(p.crawlDate))
-        .addColumn(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.post.toJson()))
+        .addColumn(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.post.toJson))
     })
 
   class HBaseOutputFormat[T](tableName: String, write: T => Put) extends OutputFormat[T] {

@@ -14,7 +14,8 @@ while true; do
   echo `date` ": Starting streaming from Kafka to HBase"
   ./kafka-2-hbase.sh > app_id 2>&1 &
   echo $! > consumer.pid
-  sleep 120
+  # wait 15 min for fb
+  sleep 900  
 
   APP_ID=`grep "Yarn cluster with application id" app_id | awk 'END {print $NF}'`
   JOB_ID=`sed -n 's/^.*ID:\s\+\([0-9a-z]\+\).*$/\1/p' app_id | head -n1`

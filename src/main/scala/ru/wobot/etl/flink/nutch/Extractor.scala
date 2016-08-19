@@ -15,7 +15,7 @@ import org.apache.nutch.metadata.Metadata
 import org.apache.nutch.parse.{ParseData, ParseText}
 import org.apache.nutch.segment.SegmentChecker
 import org.apache.nutch.util.StringUtil
-import org.slf4j.{Logger, LoggerFactory}
+import org.slf4j.LoggerFactory
 import ru.wobot.etl._
 import ru.wobot.etl.dto.{PostDto, ProfileDto}
 import ru.wobot.sm.core.mapping.{PostProperties, ProfileProperties}
@@ -26,7 +26,7 @@ class Extractor(val batch: ExecutionEnvironment) {
   private val LOGGER = LoggerFactory.getLogger(classOf[Extractor])
   batch.getConfig.enableForceKryo()
 
-  def execute(segmentPath : String): Unit = {
+  def execute(segmentPath: String): Unit = {
     try {
       batch.execute(s"Export data from segment $segmentPath")
     }
@@ -38,7 +38,7 @@ class Extractor(val batch: ExecutionEnvironment) {
     }
   }
 
-  def addSegment(segmentPath: Path, postPath:String, profilePath:String): Unit = {
+  def addSegment(segmentPath: Path, postPath: String, profilePath: String): Unit = {
     val exportJob = org.apache.hadoop.mapreduce.Job.getInstance()
     val fs = segmentPath.getFileSystem(exportJob.getConfiguration)
     if (SegmentChecker.isIndexable(segmentPath, fs)) {
@@ -97,7 +97,7 @@ class Extractor(val batch: ExecutionEnvironment) {
                 val parseMeta: Metadata = parseData.getParseMeta
                 val subType = contentMeta.get(ContentMetaConstants.TYPE);
                 if (subType != null && subType.equals(ru.wobot.sm.core.mapping.Types.PROFILE)) {
-                  val profile = new ProfileDto(id=key,
+                  val profile = new ProfileDto(id = key,
                     segment = segment,
                     crawlDate = crawlDate,
                     href = parseMeta.get(ProfileProperties.HREF),
@@ -137,6 +137,22 @@ class Extractor(val batch: ExecutionEnvironment) {
                       )
 
                       out.collect(ProfileOrPost(post.id, fetchTime, None, Some(post)))
+                    } else if (subType == ru.wobot.sm.core.mapping.Types.PROFILE) {
+                      val parseMeta = parseResult.getParseMeta
+                      val profile = new ProfileDto(id = parseResult.getUrl,
+                        segment = segment,
+                        crawlDate = crawlDate,
+                        href = parseMeta.get(ProfileProperties.HREF).asInstanceOf[String],
+                        source = parseMeta.get(ProfileProperties.SOURCE).asInstanceOf[String],
+                        smProfileId = parseMeta.get(ProfileProperties.SM_PROFILE_ID).asInstanceOf[String],
+                        name = parseMeta.get(ProfileProperties.NAME).asInstanceOf[String],
+                        city = parseMeta.get(ProfileProperties.CITY).asInstanceOf[String],
+                        reach = String.valueOf(parseMeta.get(ProfileProperties.REACH)).replace(".0", ""),
+                        friendCount = String.valueOf(parseMeta.get(ProfileProperties.FRIEND_COUNT)).replace(".0", ""),
+                        followerCount = String.valueOf(parseMeta.get(ProfileProperties.FOLLOWER_COUNT)).replace(".0", ""),
+                        gender = parseMeta.get(ProfileProperties.GENDER).asInstanceOf[String]
+                      )
+                      out.collect(ProfileOrPost(profile.id, fetchTime, Some(profile), None))
                     }
                   }
                 }
