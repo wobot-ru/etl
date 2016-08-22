@@ -9,6 +9,8 @@ package object etl {
   implicit val postTI = createTypeInformation[Post].asInstanceOf[CaseClassTypeInfo[Post]]
   implicit val profileTI = createTypeInformation[Profile].asInstanceOf[CaseClassTypeInfo[Profile]]
   implicit val detailedPostTI = createTypeInformation[DetailedPost].asInstanceOf[CaseClassTypeInfo[DetailedPost]]
+  implicit val pageTI = createTypeInformation[Page].asInstanceOf[CaseClassTypeInfo[Page]]
+  implicit val ajacencyTI = createTypeInformation[Adjacency].asInstanceOf[CaseClassTypeInfo[Adjacency]]
 
   trait Document {
     def url: String

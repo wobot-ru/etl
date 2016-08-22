@@ -1,11 +1,11 @@
-package ru.wobot.etl.flink.nutch.link
+package ru.wobot.etl
+package flink.nutch.link
 
 import com.sksamuel.elastic4s.ElasticClient
 import com.sksamuel.elastic4s.ElasticDsl.{search, _}
 import org.apache.flink.streaming.api.checkpoint.CheckpointedAsynchronously
 import org.apache.flink.streaming.api.functions.source.{RichParallelSourceFunction, SourceFunction}
 import org.elasticsearch.common.settings.Settings
-import ru.wobot.etl.Page
 
 @SerialVersionUID(1L)
 class EsSearch(val query: String) extends RichParallelSourceFunction[Page] with CheckpointedAsynchronously[Integer] {
