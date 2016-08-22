@@ -18,6 +18,7 @@
         <flink.version>1.1-WB-SNAPSHOT</flink.version>
         <scala.binary.version>2.11</scala.binary.version>
         <nutch.version>1.11</nutch.version>
+        <elastic4s.version>2.3.1</elastic4s.version>
     </properties>
 
     <dependencies>
@@ -90,6 +91,11 @@
                     <artifactId>guava</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.sksamuel.elastic4s</groupId>
+            <artifactId>elastic4s-core_${scala.binary.version}</artifactId>
+            <version>${elastic4s.version}</version>
         </dependency>
     </dependencies>
 

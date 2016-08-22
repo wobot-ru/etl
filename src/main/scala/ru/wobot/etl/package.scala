@@ -27,4 +27,10 @@ package object etl {
   case class ProfileOrPost(url: String, crawlDate: Long, profile: Option[ProfileDto], post: Option[PostDto]) extends Document
 
   case class DetailedOrWithoutAuthorPost(detailed:Option[DetailedPostDto], withoutAuthor:Option[Post])
+
+  case class Page(url: String, crawlDate: Long, rank: Double) extends Document
+
+  case class Adjacency(url: String, crawlDate: Long, neighbors: Array[String]) extends Document {
+    override def toString: String = s"Adjacency($url,$crawlDate,[${neighbors.mkString(",")}])"
+  }
 }
