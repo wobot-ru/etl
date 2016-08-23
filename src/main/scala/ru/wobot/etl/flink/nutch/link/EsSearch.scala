@@ -27,7 +27,7 @@ class EsSearch(val query: String) extends RichParallelSourceFunction[Page] with 
       }.await
       if (r.isEmpty) isRunning = false
       for (hit <- r.getHits.getHits) {
-        ctx.collect(Page(hit.getId, -1, hit.getScore))
+        ctx.collect(Page(hit.getId, 0, hit.getScore))
       }
 
       this.synchronized {

@@ -19,9 +19,7 @@ object ExtractLinksJob {
     val startTime = System.currentTimeMillis()
     val params = ParameterTool.fromArgs(args)
 
-    val extractor =
-      if (params.has("nutch-extract")) new LinkExtractor(ExecutionEnvironment.getExecutionEnvironment)
-      else null
+    val extractor = new LinkExtractor(ExecutionEnvironment.getExecutionEnvironment)
 
     val fs: FileSystem = FileSystem.get(new JobConf())
     val batchSize = params.getInt("batch-size", 1)
