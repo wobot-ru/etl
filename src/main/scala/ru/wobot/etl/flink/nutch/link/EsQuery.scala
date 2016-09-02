@@ -1,31 +1,26 @@
 package ru.wobot.etl
 package flink.nutch.link
 
-import java.io.FileWriter
 import java.nio.file.{Files, Paths}
-import java.util
 
 import com.sksamuel.elastic4s.ElasticClient
 import com.sksamuel.elastic4s.ElasticDsl.{search, _}
-import org.apache.flink.api.common.functions.{GroupReduceFunction, MapPartitionFunction}
-import org.apache.flink.api.common.operators.Order
 import org.apache.flink.api.java.io.{TypeSerializerInputFormat, TypeSerializerOutputFormat}
 import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.api.scala.hadoop.mapreduce.HadoopInputFormat
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
-import org.apache.flink.configuration.Configuration
 import org.apache.flink.core.fs.FileSystem.WriteMode
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, _}
 import org.apache.flink.util.Collector
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.io.Text
-import org.apache.hadoop.mapred.JobConf
 import org.apache.hadoop.mapreduce.Job
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat
 import org.apache.nutch.util.HadoopFSUtil
 import org.elasticsearch.common.settings.Settings
 
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 import scala.io.Source
 import scala.math.Ordering
 
@@ -50,23 +45,39 @@ object EsQuery {
       search in "wobot" -> "post" query q size 0
     }.await
 
-    if (r.totalHits > prevTotalHints) {
+    if (r.totalHits > prevTotalHints * 1.33) {
       println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
       println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   MATCH  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
       println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   QUERY  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
       println(s"\t\t${r.totalHits} > $prevTotalHints")
       println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-      val adjacency = getAdjacencyDS(ParameterTool.fromArgs(args))
+      val adjacency: DataSet[Adjacency] = getAdjacencyDS(ParameterTool.fromArgs(args))
+      val nAdj=adjacency.flatMap((adjacency: Adjacency, collector: Collector[(String, Option[String], Option[Long])]) => {
+        adjacency.neighbors.map(x => collector.collect(x, Some(adjacency.url), None))
+        collector.collect(adjacency.url, None, Some(adjacency.crawlDate))
+      }).groupBy(0).reduceGroup((tuples: Iterator[(String, Option[String], Option[Long])]) => {
+        var crawlDate: Long = 0
+        var url: String = null
+        val inlinks = new ListBuffer[String]()
+        for (i <- tuples) {
+          if (url == null) url = i._1
+          if (i._2.isDefined) inlinks += i._2.get
+          if (i._3.isDefined && i._3.get > crawlDate) crawlDate = i._3.get
+        }
+        Adjacency(url, crawlDate, inlinks.toArray)
+      })
       val tops = getTopPageDS()
-      val pg = pageRank(adjacency, tops)
+      val pg = pageRank(nAdj, tops)
 
-      val unfetched: DataSet[Page] = pg.filter(x => x.crawlDate <= 0)
+      //val unfetched: DataSet[Page] = pg.filter(x => x.crawlDate <= 0)
 
-      val top: Long = unfetched.count() / 100
+      //val top: Long = unfetched.count() / 100
+      val top: Long = r.totalHits
       println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
       println(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   $top  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
       println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-      topN(unfetched, top).map(_.url).writeAsText(new Path(INJECT_DIR_PATH, "seeds.txt").toString, WriteMode.OVERWRITE)
+      //topN(unfetched, top).map(x=>s"${x.url} nutch.score=${x.rank}").writeAsText(new Path(INJECT_DIR_PATH, "seeds.txt").toString, WriteMode.OVERWRITE)
+      pg.map(x => s"${x.url} nutch.score=${x.rank}").writeAsText(new Path(INJECT_DIR_PATH, "seeds.txt").toString, WriteMode.OVERWRITE).setParallelism(1)
       //unfetched.map(_.url).first(TOP_N).writeAsText(new Path(INJECT_DIR_PATH, "seeds.txt").toString, WriteMode.OVERWRITE)
       batch.execute()
       scala.tools.nsc.io.File(TOTAL_HINT_FILE_PATH).writeAll(r.totalHits.toString)
