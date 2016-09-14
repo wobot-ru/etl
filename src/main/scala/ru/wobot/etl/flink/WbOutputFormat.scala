@@ -19,13 +19,19 @@ object WbOutputFormat {
       .addColumn(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.toJson))
   })
 
-  def postsStore() = new HBaseOutputFormat[Post](HBaseConstants.T_POST_VIEW, p => {
+  def directPostsToES() = new HBaseOutputFormat[DetailedPost](HBaseConstants.T_POST_TO_ES, p => {
     new Put(Bytes.toBytes(s"${p.url}"))
       .addColumn(HBaseConstants.CF_ID, HBaseConstants.C_ID, Bytes.toBytes(p.url))
       .addColumn(HBaseConstants.CF_ID, HBaseConstants.C_CRAWL_DATE, Bytes.toBytes(p.crawlDate))
       .addColumn(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.post.toJson))
   })
 
+  def postsStore() = new HBaseOutputFormat[Post](HBaseConstants.T_POST_VIEW, p => {
+    new Put(Bytes.toBytes(s"${p.url}"))
+      .addColumn(HBaseConstants.CF_ID, HBaseConstants.C_ID, Bytes.toBytes(p.url))
+      .addColumn(HBaseConstants.CF_ID, HBaseConstants.C_CRAWL_DATE, Bytes.toBytes(p.crawlDate))
+      .addColumn(HBaseConstants.CF_DATA, HBaseConstants.C_JSON, Bytes.toBytes(p.post.toJson))
+  })
 
   def profilesToProcess() = new HBaseOutputFormat[Profile](HBaseConstants.T_PROFILE_TO_PROCESS, p => {
     new Put(Bytes.toBytes(s"${p.url}|${p.crawlDate}"))

@@ -26,14 +26,18 @@ object Nutch {
 
     val fs: FileSystem = FileSystem.get(new JobConf())
     val publisher =
-      if (params.has("nutch-publish")) new Publisher(StreamExecutionEnvironment.getExecutionEnvironment, properties, fs, params.getRequired(Params.TOPIC_POST), params.getRequired(Params.TOPIC_PROFILE))
+      if (params.has("nutch-publish")) new Publisher(StreamExecutionEnvironment.getExecutionEnvironment,
+        properties, fs, params.getRequired(Params.TOPIC_POST),
+        params.getRequired(Params.TOPIC_DETAILED_POST),
+        params.getRequired(Params.TOPIC_PROFILE)
+      )
       else null
 
     val batchSize = params.getInt("batch-size", 1)
     val startSeg = params.get("nutch-seg-start", null)
     val stopSeg = params.get("nutch-seg-stop", null)
     var segmentToAdd = 0
-    var latestSeg = "NO_SEG";
+    var latestSeg = "NO_SEG"
 
     try {
       if (params.has("dir")) {
@@ -65,7 +69,6 @@ object Nutch {
         addSegment(latestSegPath)
       }
 
-
       if (segmentToAdd > 0) {
         if (extractor != null) extractor.execute(latestSeg)
         if (publisher != null) publisher.execute(latestSeg)
@@ -80,21 +83,24 @@ object Nutch {
       segmentToAdd += 1
       println(s"Extract: $segmentPath")
       val postPath = new Path(segmentPath, "parse_posts").toString
+      val detailedPostPath = new Path(segmentPath, "parse_detailed_posts").toString
       val profilePath = new Path(segmentPath, "parse_profiles").toString
 
       if (extractor != null) {
-        extractor.addSegment(segmentPath, postPath, profilePath)
+        extractor.addSegment(segmentPath, postPath, detailedPostPath, profilePath)
         if (segmentToAdd == batchSize) {
-          extractor.execute(s"${segmentPath}")
+          extractor.execute(s"$segmentPath")
         }
       }
 
       if (publisher != null) {
         LOGGER.info(s"Publish segment to kafka: $segmentPath")
         publisher.publishPosts(postPath)
+        publisher.publishDetailedPosts(detailedPostPath)
         publisher.publishProfiles(profilePath)
+
         if (segmentToAdd == batchSize) {
-          publisher.execute(s"${segmentPath}")
+          publisher.execute(s"$segmentPath")
         }
       }
 

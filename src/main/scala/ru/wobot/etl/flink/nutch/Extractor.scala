@@ -1,5 +1,8 @@
 package ru.wobot.etl.flink.nutch
 
+import java.time.format.DateTimeFormatter
+import java.time.{LocalDate, ZonedDateTime}
+
 import com.google.gson.Gson
 import org.apache.flink.api.common.operators.Order
 import org.apache.flink.api.java.io.TypeSerializerOutputFormat
@@ -17,7 +20,7 @@ import org.apache.nutch.segment.SegmentChecker
 import org.apache.nutch.util.StringUtil
 import org.slf4j.LoggerFactory
 import ru.wobot.etl._
-import ru.wobot.etl.dto.{PostDto, ProfileDto}
+import ru.wobot.etl.dto.{DetailedPostDto, PostDto, ProfileDto}
 import ru.wobot.sm.core.mapping.{PostProperties, ProfileProperties}
 import ru.wobot.sm.core.meta.ContentMetaConstants
 import ru.wobot.sm.core.parse.ParseResult
@@ -38,7 +41,7 @@ class Extractor(val batch: ExecutionEnvironment) {
     }
   }
 
-  def addSegment(segmentPath: Path, postPath: String, profilePath: String): Unit = {
+  def addSegment(segmentPath: Path, postPath: String, detailedPostPath: String, profilePath: String): Unit = {
     val exportJob = org.apache.hadoop.mapreduce.Job.getInstance()
     val fs = segmentPath.getFileSystem(exportJob.getConfiguration)
     if (SegmentChecker.isIndexable(segmentPath, fs)) {
@@ -66,7 +69,7 @@ class Extractor(val batch: ExecutionEnvironment) {
         val data = map.rebalance().groupBy(0).reduceGroup((tuples: Iterator[(Text, NutchWritable)], out: Collector[ProfileOrPost]) => {
           val gson = new Gson()
           def fromJson[T](json: String, clazz: Class[T]): T = {
-            return gson.fromJson(json, clazz)
+            gson.fromJson(json, clazz)
           }
 
           var key: String = null
@@ -76,10 +79,9 @@ class Extractor(val batch: ExecutionEnvironment) {
 
           for ((url, data) <- tuples) {
             data.get() match {
-              case c: CrawlDatum => {
+              case c: CrawlDatum =>
                 key = url.toString
                 fetchDatum = c
-              }
               case d: ParseData => parseData = d
               case t: ParseText => parseText = t
               case _ => ()
@@ -91,11 +93,11 @@ class Extractor(val batch: ExecutionEnvironment) {
             if (skipFromElastic == null || !skipFromElastic.equals("1")) {
               val fetchTime: Long = fetchDatum.getFetchTime
               val crawlDate: String = fetchTime.toString
-              val segment = contentMeta.get(org.apache.nutch.metadata.Nutch.SEGMENT_NAME_KEY);
+              val segment = contentMeta.get(org.apache.nutch.metadata.Nutch.SEGMENT_NAME_KEY)
               val isSingleDoc: Boolean = !"true".equals(contentMeta.get(ContentMetaConstants.MULTIPLE_PARSE_RESULT))
               if (isSingleDoc) {
                 val parseMeta: Metadata = parseData.getParseMeta
-                val subType = contentMeta.get(ContentMetaConstants.TYPE);
+                val subType = contentMeta.get(ContentMetaConstants.TYPE)
                 if (subType != null && subType.equals(ru.wobot.sm.core.mapping.Types.PROFILE)) {
                   val profile = new ProfileDto(id = key,
                     segment = segment,
@@ -110,11 +112,11 @@ class Extractor(val batch: ExecutionEnvironment) {
                     followerCount = parseMeta.get(ProfileProperties.FOLLOWER_COUNT),
                     gender = parseMeta.get(ProfileProperties.GENDER)
                   )
-                  out.collect(ProfileOrPost(profile.id, fetchTime, Some(profile), None))
+                  out.collect(ProfileOrPost(profile.id, fetchTime, Some(profile), None, None))
                 }
               }
               else if (parseText != null) {
-                val content: String = parseText.getText()
+                val content: String = parseText.getText
                 if (!StringUtil.isEmpty(content)) {
                   val parseResults: Array[ParseResult] = fromJson[Array[ParseResult]](parseText.getText, classOf[Array[ParseResult]])
                   if (parseResults != null) for (parseResult <- parseResults) {
@@ -136,7 +138,7 @@ class Extractor(val batch: ExecutionEnvironment) {
                         isComment = parseMeta.get(PostProperties.IS_COMMENT).asInstanceOf[Boolean]
                       )
 
-                      out.collect(ProfileOrPost(post.id, fetchTime, None, Some(post)))
+                      out.collect(ProfileOrPost(post.id, fetchTime, None, Some(post), None))
                     } else if (subType == ru.wobot.sm.core.mapping.Types.PROFILE) {
                       val parseMeta = parseResult.getParseMeta
                       val profile = new ProfileDto(id = parseResult.getUrl,
@@ -152,7 +154,30 @@ class Extractor(val batch: ExecutionEnvironment) {
                         followerCount = String.valueOf(parseMeta.get(ProfileProperties.FOLLOWER_COUNT)).replace(".0", ""),
                         gender = parseMeta.get(ProfileProperties.GENDER).asInstanceOf[String]
                       )
-                      out.collect(ProfileOrPost(profile.id, fetchTime, Some(profile), None))
+                      out.collect(ProfileOrPost(profile.id, fetchTime, Some(profile), None, None))
+                    }
+                    else if (subType == ru.wobot.sm.core.mapping.Types.DETAILED_POST) {
+                      val parseMeta = parseResult.getParseMeta
+                      val detailedPost = new DetailedPostDto(id = parseResult.getUrl,
+                        segment = segment,
+                        crawlDate = crawlDate,
+                        href = parseMeta.get(PostProperties.HREF).asInstanceOf[String],
+                        source = parseMeta.get(PostProperties.SOURCE).asInstanceOf[String],
+                        profileId = parseMeta.get(PostProperties.PROFILE_ID).asInstanceOf[String],
+                        smPostId = String.valueOf(parseMeta.get(PostProperties.SM_POST_ID)).replace(".0", ""),
+                        parentPostId = parseMeta.get(PostProperties.PARENT_POST_ID).asInstanceOf[String],
+                        body = parseMeta.get(PostProperties.BODY).asInstanceOf[String],
+                        date = parseMeta.get(PostProperties.POST_DATE).asInstanceOf[String],
+                        engagement = String.valueOf(parseMeta.get(PostProperties.ENGAGEMENT)).replace(".0", ""),
+                        isComment = parseMeta.get(PostProperties.IS_COMMENT).asInstanceOf[Boolean],
+                        profileCity = parseMeta.get("profile_city").asInstanceOf[String],
+                        profileGender = parseMeta.get("profile_gender").asInstanceOf[String],
+                        profileHref = parseMeta.get("profile_href").asInstanceOf[String],
+                        profileName = parseMeta.get("profile_name").asInstanceOf[String],
+                        reach = String.valueOf(parseMeta.get(ProfileProperties.REACH)).replace(".0", ""),
+                        smProfileId = String.valueOf(parseMeta.get(ProfileProperties.SM_PROFILE_ID)).replace(".0", "")
+                      )
+                      out.collect(ProfileOrPost(detailedPost.id, fetchTime, None, None, Some(detailedPost)))
                     }
                   }
                 }
@@ -163,10 +188,22 @@ class Extractor(val batch: ExecutionEnvironment) {
 
 
         val unic = data.sortPartition(0, Order.ASCENDING)
-        val posts = unic.filter(x => x.post.isDefined).map(r => Post(r.url, r.crawlDate, r.post.get))
+        val posts: DataSet[Post] = unic.filter(x => x.post.isDefined).map(r => Post(r.url, r.crawlDate, r.post.get)).filter(
+          p => {
+            val postDate = ZonedDateTime.parse(p.post.date.replace(".000", ""), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssZZ"))
+            postDate.toLocalDate.isAfter(LocalDate.now().minusDays(90)) // three months for now
+          }
+        )
+        val detailedPosts: DataSet[DetailedPost] = unic.filter(x => x.detailed.isDefined).map(r => DetailedPost(r.url, r.crawlDate, r.detailed.get)).filter(
+          p => {
+            val postDate = ZonedDateTime.parse(p.post.date.replace(".000", ""), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssZZ"))
+            postDate.toLocalDate.isAfter(LocalDate.now().minusDays(7)) //week for now
+          }
+        )
         val profiles = unic.filter(x => x.profile.isDefined).map(r => Profile(r.url, r.crawlDate, r.profile.get))
 
         posts.write(new TypeSerializerOutputFormat[Post], postPath, WriteMode.OVERWRITE)
+        detailedPosts.write(new TypeSerializerOutputFormat[DetailedPost], detailedPostPath, WriteMode.OVERWRITE)
         profiles.write(new TypeSerializerOutputFormat[Profile], profilePath, WriteMode.OVERWRITE)
       }
       else

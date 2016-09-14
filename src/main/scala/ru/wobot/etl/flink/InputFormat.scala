@@ -72,8 +72,6 @@ object InputFormat {
         }
 
       }
-
-
     }
 
     override def getTableName = tableName
@@ -85,5 +83,4 @@ object InputFormat {
         .addColumn(HBaseConstants.CF_DATA, HBaseConstants.C_JSON)
     }
   }
-
 }

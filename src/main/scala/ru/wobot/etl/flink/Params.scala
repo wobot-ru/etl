@@ -3,6 +3,7 @@ package ru.wobot.etl.flink
 object Params {
   val TOPIC_POST = "topic-post"
   val TOPIC_PROFILE = "topic-profile"
+  val TOPIC_DETAILED_POST = "topic-detailed-post"
 
   val DIR_UPLOAD_POST = "dir-upload-post"
   val DETAILED_POST_OUT_DIR = "detailed-post-out-dir"

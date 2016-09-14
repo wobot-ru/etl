@@ -13,14 +13,17 @@ import ru.wobot.etl._
 
 import scala.collection.mutable.ListBuffer
 
-
-class Publisher(stream: StreamExecutionEnvironment, properties: Properties, fs: FileSystem, topicPost: String, topicProfile: String) {
+class Publisher(stream: StreamExecutionEnvironment, properties: Properties, fs: FileSystem,
+                topicPost: String,
+                topicDetailedPost: String,
+                topicProfile: String) {
   private val LOGGER = LoggerFactory.getLogger(classOf[Publisher])
 
   stream.getConfig.setRestartStrategy(RestartStrategies.fixedDelayRestart(4, 15000))
   stream.enableCheckpointing(3000)
 
   val posts = ListBuffer[String]()
+  val detailedPosts = ListBuffer[String]()
   val profiles = ListBuffer[String]()
   stream.getConfig.enableForceKryo()
 
@@ -32,6 +35,10 @@ class Publisher(stream: StreamExecutionEnvironment, properties: Properties, fs: 
     posts += post
   }
 
+  def publishDetailedPosts(detailedPost: String) = {
+    detailedPosts += detailedPost
+  }
+
   def execute(segmentPath: String) = {
     for (post <- posts) {
       if (fs.exists(new Path(post))) {
@@ -41,6 +48,15 @@ class Publisher(stream: StreamExecutionEnvironment, properties: Properties, fs: 
       }
       else
         LOGGER.info(s"Skip import, file not exist: $post")
+    }
+    for (detailedPost <- detailedPosts) {
+      if (fs.exists(new Path(detailedPost))) {
+        stream
+          .readFile(new TypeSerializerInputFormat[DetailedPost](detailedPostTI), detailedPost)
+          .addSink(new FlinkKafkaProducer09[DetailedPost](topicDetailedPost, new TypeInformationSerializationSchema[DetailedPost](detailedPostTI, stream.getConfig), properties))
+      }
+      else
+        LOGGER.info(s"Skip import, file not exist: $detailedPost")
     }
     for (profile <- profiles) {
       if (fs.exists(new Path(profile))) {

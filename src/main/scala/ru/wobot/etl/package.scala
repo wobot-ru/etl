@@ -9,6 +9,7 @@ package object etl {
   implicit val postTI = createTypeInformation[Post].asInstanceOf[CaseClassTypeInfo[Post]]
   implicit val profileTI = createTypeInformation[Profile].asInstanceOf[CaseClassTypeInfo[Profile]]
   implicit val detailedPostTI = createTypeInformation[DetailedPost].asInstanceOf[CaseClassTypeInfo[DetailedPost]]
+  implicit val detailedPostDtoTI = createTypeInformation[DetailedPostDto]
 
   trait Document {
     def url: String
@@ -24,7 +25,7 @@ package object etl {
 
   case class ExtractedPaths(profiles: Option[String], posts: Option[String])
 
-  case class ProfileOrPost(url: String, crawlDate: Long, profile: Option[ProfileDto], post: Option[PostDto]) extends Document
+  case class ProfileOrPost(url: String, crawlDate: Long, profile: Option[ProfileDto], post: Option[PostDto], detailed:Option[DetailedPostDto]) extends Document
 
   case class DetailedOrWithoutAuthorPost(detailed:Option[DetailedPostDto], withoutAuthor:Option[Post])
 }
