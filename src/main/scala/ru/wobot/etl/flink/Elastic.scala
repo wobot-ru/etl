@@ -62,7 +62,7 @@ object Elastic {
 
       val esConfig: util.Map[String, String] = new util.HashMap[String, String]()
       esConfig.put("cluster.name", "wobot-new-cluster")
-      esConfig.put("bulk.flush.max.size.mb", "10")
+      esConfig.put("bulk.flush.max.size.mb", "5")
       //esConfig.put("bulk.flush.max.actions", "1000")
       //ParameterTool.fromPropertiesFile(getClass.getClassLoader.getResource("es.properties").getFile).toMap
 

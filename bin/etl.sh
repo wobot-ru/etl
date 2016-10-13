@@ -12,17 +12,24 @@ while true; do
   fi
   
   echo `date` ": Starting streaming from Kafka to HBase"
-  ./kafka-2-hbase.sh > app_id 2>&1 &
-  echo $! > consumer.pid
-  # wait 15 min for fb
-  sleep 900  
+  ./kafka-2-hbase.sh > fb_app_id 2>&1 &
+#  echo $! > consumer.pid
 
-  APP_ID=`grep "Yarn cluster with application id" app_id | awk 'END {print $NF}'`
-  JOB_ID=`sed -n 's/^.*ID:\s\+\([0-9a-z]\+\).*$/\1/p' app_id | head -n1`
+  ./kafka-vk-2-hbase.sh > vk_app_id 2>&1 &
+#  echo $! > consumer.pid  
+  sleep 900
+
+  FB_APP_ID=`grep "Yarn cluster with application id" fb_app_id | awk 'END {print $NF}'`
+  FB_JOB_ID=`sed -n 's/^.*ID:\s\+\([0-9a-z]\+\).*$/\1/p' fb_app_id | head -n1`
+
+  VK_APP_ID=`grep "Yarn cluster with application id" vk_app_id | awk 'END {print $NF}'`
+  VK_JOB_ID=`sed -n 's/^.*ID:\s\+\([0-9a-z]\+\).*$/\1/p' vk_app_id | head -n1`
 
   echo `date` ": Cancelling job" "$JOB_ID"
-  $FLINK_BIN/flink cancel "$JOB_ID" --jobmanager yarn-cluster -yid "$APP_ID"
-  rm app_id
+  $FLINK_BIN/flink cancel "$FB_JOB_ID" --jobmanager yarn-cluster -yid "$FB_APP_ID"
+  $FLINK_BIN/flink cancel "$VK_JOB_ID" --jobmanager yarn-cluster -yid "$VK_APP_ID"
+  rm fb_app_id
+  rm vk_app_id
 
   echo `date` ": Start building HBase views..."
   ./hbase-build-view.sh
@@ -36,9 +43,14 @@ while true; do
   echo `date` ": Start cleaning HBase processing tables..."
   hbase shell <<END 
        truncate 'profile-to-process'
-       truncate 'post-to-process'
        truncate 'post-to-es'
        truncate 'post'
+       disable 'post-to-process'
+       drop 'post-to-process'
+       snapshot 'post-without-profile', 'post-without-profile-snapshot'
+       clone_snapshot 'post-without-profile-snapshot', 'post-to-process'
+       delete_snapshot 'post-without-profile-snapshot'
+       truncate 'post-without-profile'
        exit
 END
   echo `date` ": Finish cleaning HBase processing tables"
